@@ -15,6 +15,7 @@ import {
   MOCK_WEEKLY_DAYS,
 } from '@/lib/insights-mock-fixture';
 import { useCategories } from '@/lib/use-categories';
+import { useDemoData } from '@/lib/use-demo-data';
 import { useState } from 'react';
 
 /**
@@ -26,6 +27,7 @@ import { useState } from 'react';
  * CLAUDE.md.
  */
 export default function InsightsPage() {
+  useDemoData(); // seeds the same demo activities Home/History use — see that hook
   const categories = useCategories();
   const [selectedActivity, setSelectedActivity] = useState(MOCK_ACTIVITY_ANALYTICS[0].name);
 

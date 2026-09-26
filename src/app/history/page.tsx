@@ -8,6 +8,7 @@ import { getDailySummary } from '@/lib/get-daily-summary';
 import { toIsoDate } from '@/lib/iso-date';
 import { useActivities } from '@/lib/use-activities';
 import { useCategories } from '@/lib/use-categories';
+import { useDemoData } from '@/lib/use-demo-data';
 import { useMemo, useState } from 'react';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -17,8 +18,14 @@ const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
  * day's summary below (reusing the same Daily summary + Timeline used on
  * Home). Month navigation and richer day previews are left for the
  * Implement agent — see CLAUDE.md.
+ *
+ * useDemoData() here (return value unused) guarantees the same demo seed
+ * Home relies on also runs for a visitor who lands on /history directly —
+ * see that hook for why this is a real Dexie write, unlike everything else
+ * on this page.
  */
 export default function HistoryPage() {
+  useDemoData();
   const today = new Date();
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selectedDate, setSelectedDate] = useState(toIsoDate(today));

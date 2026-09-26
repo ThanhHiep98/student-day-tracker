@@ -11,14 +11,14 @@ import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { RecentActivityRail } from '@/components/recent-activity-rail';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TipCard } from '@/components/tip-card';
-import { buildDemoActivities } from '@/lib/demo-activities';
 import { getDailySummary } from '@/lib/get-daily-summary';
 import { toIsoDate } from '@/lib/iso-date';
 import type { Activity, Category } from '@/lib/types';
 import { useActivities } from '@/lib/use-activities';
 import { useCategories } from '@/lib/use-categories';
+import { useDemoData } from '@/lib/use-demo-data';
 import { useInstallPrompt } from '@/lib/use-install-prompt';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 const GREETING_BY_HOUR = (hour: number) => {
   if (hour < 12) return 'Good morning';
@@ -27,7 +27,6 @@ const GREETING_BY_HOUR = (hour: number) => {
 };
 
 const SESSION_CATEGORY_COLORS = ['#0ea5e9', '#8b5cf6', '#14b8a6', '#f97316'];
-const DEMO_DISMISSED_KEY = 'sdt-demo-dismissed';
 
 type FormState =
   | { open: false }
@@ -36,17 +35,22 @@ type FormState =
 
 /**
  * Home — req. 1. Add/Edit/Delete Activity and "+ New category" are wired
- * here as SESSION-LOCAL state layered over the real (currently empty) Dexie
- * read — this is the Frontend phase from
- * plans/2026-09-26-add-activity.html §1.1: no Dexie write (db.activities,
- * db.categories) ever runs on this page. Backend phase (plan §2) replaces
- * this overlay with real Dexie writes behind the same UI. See CLAUDE.md.
+ * here as SESSION-LOCAL state layered over the real Dexie read — this is
+ * the Frontend phase from plans/2026-09-26-add-activity.html §1.1: no Dexie
+ * write from a *user action* (db.activities, db.categories) ever runs on
+ * this page. Backend phase (plan §2) replaces this overlay with real Dexie
+ * writes behind the same UI. See CLAUDE.md.
+ *
+ * Demo content is the one exception — useDemoData seeds it straight into
+ * Dexie (see that file for why) so it's identical across Home, History, and
+ * every other page, not a Home-only overlay.
  */
 export default function Home() {
   const today = toIsoDate(new Date());
   const dbActivities = useActivities(today);
   const dbCategories = useCategories();
   const { canInstall, install, dismiss } = useInstallPrompt();
+  const { isDemo, clearDemo } = useDemoData();
 
   const [sessionCategories, setSessionCategories] = useState<Category[]>([]);
   const [sessionActivities, setSessionActivities] = useState<Activity[]>([]);
@@ -55,27 +59,6 @@ export default function Home() {
 
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
-  const [isDemo, setIsDemo] = useState(false);
-  const hasCheckedDemoRef = useRef(false);
-
-  // Seed sample activities once, only if there's genuinely nothing to show
-  // (no real Dexie data yet, nothing added this session) and the visitor
-  // hasn't cleared the demo before. Runs at most once per mount — re-adding
-  // and then deleting everything down to zero must NOT bring the demo back.
-  useEffect(() => {
-    if (hasCheckedDemoRef.current || dbActivities === undefined) return;
-    hasCheckedDemoRef.current = true;
-    if (dbActivities.length > 0) return;
-    if (localStorage.getItem(DEMO_DISMISSED_KEY) === '1') return;
-    setSessionActivities(buildDemoActivities(today));
-    setIsDemo(true);
-  }, [dbActivities, today]);
-
-  function handleClearDemo() {
-    setSessionActivities([]);
-    setIsDemo(false);
-    localStorage.setItem(DEMO_DISMISSED_KEY, '1');
-  }
 
   const now = new Date();
   const dateLabel = now.toLocaleDateString(undefined, {
@@ -155,7 +138,7 @@ export default function Home() {
       </header>
 
       {canInstall && <InstallBanner onInstall={install} onDismiss={dismiss} />}
-      {isDemo && <DemoBanner onClear={handleClearDemo} />}
+      {isDemo && <DemoBanner onClear={clearDemo} />}
 
       {activities === undefined || categories === undefined ? (
         <LoadingSkeleton />
