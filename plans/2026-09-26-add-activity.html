@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Plan: Add Activity</title>
+<style>
+  body { font: 15px/1.55 -apple-system, system-ui, sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1.5rem; color: #18181b; }
+  h1 { font-size: 1.5rem; margin-bottom: .25rem; }
+  .meta { color: #71717a; font-size: .85rem; margin-bottom: 1.5rem; }
+  h2 { font-size: 1.05rem; margin-top: 2.25rem; border-bottom: 1px solid #e4e4e7; padding-bottom: .35rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; margin-top: .75rem; }
+  th, td { text-align: left; padding: .55rem .6rem; border-bottom: 1px solid #e4e4e7; vertical-align: top; }
+  th { color: #52525b; font-weight: 600; background: #fafafa; }
+  tr:last-child td { border-bottom: none; }
+  code { background: #f4f4f5; padding: .1rem .35rem; border-radius: 4px; font-size: .85em; }
+  .risk-low { color: #16a34a; font-weight: 600; }
+  .risk-med { color: #d97706; font-weight: 600; }
+  ul.checklist { list-style: none; padding-left: 0; margin-top: .75rem; }
+  ul.checklist li { padding: .35rem 0; }
+  ul.checklist li::before { content: "☐  "; color: #a1a1aa; }
+  .diagram { border: 1px solid #e4e4e7; border-radius: 12px; padding: 1rem; margin-top: .75rem; background: #fafafa; }
+  svg text { font: 12px -apple-system, system-ui, sans-serif; fill: #18181b; }
+  svg .lbl { fill: #71717a; font-size: 11px; }
+  .status { display: inline-block; background: #dcfce7; color: #166534; font-size: .8rem; font-weight: 600; padding: .2rem .55rem; border-radius: 999px; margin-top: .5rem; }
+</style>
+</head>
+<body>
+  <h1>Plan: Add Activity (write flow)</h1>
+  <p class="meta">2026-09-26 · requirement §1.3 · agent: planner → next: implementer</p>
+
+  <h2>Scope</h2>
+  <p>
+    Turn the disabled <code>+ Add Activity</code> button on Home into a working form: name,
+    category (fixed defaults + inline "new category"), start/end time. Submitting writes an
+    <code>Activity</code> to Dexie; <code>Today&apos;s Timeline</code> and the
+    <code>Daily summary</code> card update immediately via the existing live queries — no new
+    query plumbing needed. <strong>Out of scope:</strong> editing/deleting an existing activity
+    (next slice), Insights.
+  </p>
+
+  <h2>Requirements</h2>
+  <table>
+    <tr><th>Req.</th><th>Behavior</th><th>Acceptance check</th></tr>
+    <tr>
+      <td>1.3</td>
+      <td>Category field offers the 4 fixed categories; user can add their own on top</td>
+      <td>New custom category appears in the select immediately and is usable without a reload</td>
+    </tr>
+    <tr>
+      <td>1.2 / 1.1</td>
+      <td>New activity appears on the timeline and in the daily total/category bars right away</td>
+      <td>No manual refresh — <code>useLiveQuery</code> re-renders both</td>
+    </tr>
+    <tr>
+      <td>(implied)</td>
+      <td>Can&apos;t submit nonsense: empty name, or end time at/before start time</td>
+      <td>Inline error text, submit button disabled/no-ops until valid</td>
+    </tr>
+  </table>
+
+  <h2>Flow</h2>
+  <div class="diagram">
+    <svg viewBox="0 0 780 210" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0L10 5L0 10z" fill="#71717a" />
+        </marker>
+      </defs>
+
+      <!-- main row -->
+      <rect x="10"  y="30" width="150" height="54" rx="10" fill="#eef2ff" stroke="#818cf8" />
+      <text x="85" y="52" text-anchor="middle" font-weight="600">AddActivityForm</text>
+      <text x="85" y="68" text-anchor="middle" class="lbl">onSubmit(values)</text>
+
+      <rect x="205" y="30" width="150" height="54" rx="10" fill="#f4f4f5" stroke="#a1a1aa" />
+      <text x="280" y="52" text-anchor="middle" font-weight="600">buildActivity()</text>
+      <text x="280" y="68" text-anchor="middle" class="lbl">pure, validated + tested</text>
+
+      <rect x="400" y="30" width="150" height="54" rx="10" fill="#fef3c7" stroke="#d97706" />
+      <text x="475" y="52" text-anchor="middle" font-weight="600">db.activities.add()</text>
+      <text x="475" y="68" text-anchor="middle" class="lbl">Dexie write</text>
+
+      <rect x="595" y="30" width="175" height="54" rx="10" fill="#dcfce7" stroke="#16a34a" />
+      <text x="682" y="52" text-anchor="middle" font-weight="600">useLiveQuery</text>
+      <text x="682" y="68" text-anchor="middle" class="lbl">Timeline + Daily summary</text>
+
+      <line x1="160" y1="57" x2="205" y2="57" stroke="#71717a" marker-end="url(#arrow)" />
+      <line x1="355" y1="57" x2="400" y2="57" stroke="#71717a" marker-end="url(#arrow)" />
+      <line x1="550" y1="57" x2="595" y2="57" stroke="#71717a" marker-end="url(#arrow)" />
+
+      <!-- category branch -->
+      <rect x="10" y="140" width="150" height="54" rx="10" fill="#eef2ff" stroke="#818cf8" />
+      <text x="85" y="162" text-anchor="middle" font-weight="600">"+ New category"</text>
+      <text x="85" y="178" text-anchor="middle" class="lbl">inline in the form</text>
+
+      <rect x="205" y="140" width="150" height="54" rx="10" fill="#f4f4f5" stroke="#a1a1aa" />
+      <text x="280" y="162" text-anchor="middle" font-weight="600">buildCategory()</text>
+      <text x="280" y="178" text-anchor="middle" class="lbl">pure, tested</text>
+
+      <rect x="400" y="140" width="150" height="54" rx="10" fill="#fef3c7" stroke="#d97706" />
+      <text x="475" y="162" text-anchor="middle" font-weight="600">db.categories.add()</text>
+      <text x="475" y="178" text-anchor="middle" class="lbl">Dexie write</text>
+
+      <line x1="160" y1="167" x2="205" y2="167" stroke="#71717a" marker-end="url(#arrow)" />
+      <line x1="355" y1="167" x2="400" y2="167" stroke="#71717a" marker-end="url(#arrow)" />
+      <line x1="475" y1="140" x2="475" y2="115" stroke="#a1a1aa" stroke-dasharray="3 3" />
+      <line x1="475" y1="115" x2="85"  y2="115" stroke="#a1a1aa" stroke-dasharray="3 3" />
+      <line x1="85"  y1="115" x2="85"  y2="84"  stroke="#a1a1aa" stroke-dasharray="3 3" marker-end="url(#arrow)" />
+      <text x="280" y="108" text-anchor="middle" class="lbl">select immediately shows the new category</text>
+    </svg>
+  </div>
+
+  <h2>Tasks</h2>
+  <table>
+    <tr><th>Phase</th><th>Step</th><th>File(s)</th><th>Depends on</th><th>Risk</th></tr>
+    <tr><td>1</td><td>Pure builder: trim name, require <code>endMinutes &gt; startMinutes</code>, require known <code>categoryId</code>, generate <code>id</code>/<code>createdAt</code></td><td><code>src/lib/add-activity.ts</code> + <code>.test.ts</code></td><td>—</td><td class="risk-low">Low</td></tr>
+    <tr><td>1</td><td>Pure builder: trim name, dedupe against existing category names (case-insensitive)</td><td><code>src/lib/add-category.ts</code> + <code>.test.ts</code></td><td>—</td><td class="risk-low">Low</td></tr>
+    <tr><td>2</td><td>Form component: name input, category <code>&lt;select&gt;</code> + "new category" inline row, start/end time inputs, inline validation errors</td><td><code>src/components/add-activity-form.tsx</code></td><td>Phase 1</td><td class="risk-med">Med</td></tr>
+    <tr><td>2</td><td>Wire into Home: toggle button state, mount form in a <code>&lt;dialog&gt;</code> (reuse the pattern in <code>confirm-dialog.tsx</code>), call <code>db.activities.add(...)</code> / <code>db.categories.add(...)</code> on submit</td><td><code>src/app/page.tsx</code></td><td>Phase 2 above</td><td class="risk-med">Med</td></tr>
+    <tr><td>3</td><td>E2E: open form → fill → submit → row appears on timeline, total updates</td><td><code>tests/e2e/add-activity.spec.ts</code></td><td>Phase 2</td><td class="risk-low">Low</td></tr>
+  </table>
+
+  <h2>Testing strategy</h2>
+  <table>
+    <tr><th>Layer</th><th>Proves</th><th>File</th></tr>
+    <tr><td>Unit</td><td>Validation rules (empty name, bad time range, unknown category, dedupe)</td><td><code>add-activity.test.ts</code>, <code>add-category.test.ts</code></td></tr>
+    <tr><td>E2E</td><td>Full add flow, timeline + summary update without reload</td><td><code>tests/e2e/add-activity.spec.ts</code></td></tr>
+    <tr><td>a11y</td><td>Form dialog has 0 axe violations while open</td><td>extend <code>tests/e2e/a11y.spec.ts</code></td></tr>
+  </table>
+
+  <h2>Success criteria</h2>
+  <ul class="checklist">
+    <li><code>+ Add Activity</code> button opens the form (no longer <code>disabled</code>)</li>
+    <li>Valid submit creates an <code>Activity</code> row, visible on Home&apos;s timeline instantly</li>
+    <li>Daily summary total + per-category bars update instantly on submit</li>
+    <li>Empty name or end ≤ start blocks submit with visible inline error text</li>
+    <li>Creating a custom category makes it immediately selectable in the same form session</li>
+    <li><code>pnpm test</code> passes, including the two new unit test files</li>
+    <li><code>pnpm test:e2e</code> passes, including the new add-activity spec</li>
+    <li>0 axe violations on Home with the form open</li>
+  </ul>
+</body>
+</html>
