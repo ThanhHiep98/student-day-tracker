@@ -26,11 +26,11 @@ test('nav bar moves between Home, History, and Insights', async ({ page }) => {
   await page.goto('/');
 
   await page.getByRole('link', { name: 'History' }).click();
-  await expect(page).toHaveURL('/history');
+  await expect(page).toHaveURL('/history/');
   await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeVisible();
 
   await page.getByRole('link', { name: 'Insights' }).click();
-  await expect(page).toHaveURL('/insights');
+  await expect(page).toHaveURL('/insights/');
   await expect(page.getByRole('heading', { name: 'Insights', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Weekly overview' })).toBeVisible();
 

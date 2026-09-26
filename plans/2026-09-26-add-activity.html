@@ -332,6 +332,7 @@
   <tr><td>2</td><td>Build the five Insights components (<code>WeeklyOverviewChart</code>, <code>ComparePanel</code>, <code>InsightCards</code>, <code>MonthlyOverviewCard</code>, <code>ActivityAnalyticsPanel</code>) against a static mock-data fixture matching the mockups' numbers (e.g. 42h30m this week, Work 21h15m, etc.)</td><td><code>src/components/weekly-overview-chart.tsx</code>, <code>compare-panel.tsx</code>, <code>insight-cards.tsx</code>, <code>monthly-overview-card.tsx</code>, <code>activity-analytics-panel.tsx</code></td><td>—</td><td class="risk-med">Med</td></tr>
   <tr><td>2</td><td>Replace the 5 dashed <code>&lt;InsightSection&gt;</code> placeholders with the real components + fixture; clicking an activity name switches <code>ActivityAnalyticsPanel</code>'s (still mock) drill-down data</td><td><code>src/app/insights/page.tsx</code></td><td>Task above</td><td class="risk-med">Med</td></tr>
   <tr><td>3</td><td>Extend e2e/a11y coverage: Add Activity dialog opens/validates/closes, edited/deleted rows reflect in the mock list, Insights renders its 5 sections with real content (no more placeholder headings), 0 axe violations with the dialog open</td><td><code>tests/e2e/smoke.spec.ts</code>, <code>tests/e2e/a11y.spec.ts</code></td><td>All tasks above</td><td class="risk-low">Low</td></tr>
+  <tr><td>4</td><td>Deploy to GitHub Pages so the Frontend (mock-data) build is reachable at a public URL for Customer to confirm the design/UI — static export (<code>output: 'export'</code>), <code>basePath</code>/<code>assetPrefix</code> for the project-site path, GitHub Actions workflow to auto-build + publish on push to <code>master</code></td><td><code>next.config.ts</code>, <code>.github/workflows/deploy.yml</code>, <code>src/app/manifest.ts</code></td><td>All Frontend tasks above (needs the full mock UI to review)</td><td class="risk-med">Med</td></tr>
 </table>
 
 <h2>2. Backend</h2>
@@ -494,6 +495,7 @@ flowchart LR
     <li>Open Q&amp;A items are resolved (or explicitly deferred with a stated default) before <code>buildInsightCards()</code> and the week/month boundary logic are implemented</li>
     <li><code>pnpm typecheck && pnpm check && pnpm test -- --run && pnpm build && pnpm test:e2e</code> all pass</li>
     <li>0 axe violations on all three routes, including with the Add Activity dialog open</li>
+    <li>The Frontend build is live on GitHub Pages at a public URL Customer can open directly to review the design, with all 3 routes working (not just the homepage)</li>
   </ul>
 
 <script>
