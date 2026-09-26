@@ -5,18 +5,20 @@ import { AddActivityForm, type AddActivityFormValues } from '@/components/add-ac
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DailyDonutChart } from '@/components/daily-donut-chart';
 import { DailySummaryCard } from '@/components/daily-summary-card';
+import { DemoBanner } from '@/components/demo-banner';
 import { InstallBanner } from '@/components/install-banner';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { RecentActivityRail } from '@/components/recent-activity-rail';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TipCard } from '@/components/tip-card';
+import { buildDemoActivities } from '@/lib/demo-activities';
 import { getDailySummary } from '@/lib/get-daily-summary';
 import { toIsoDate } from '@/lib/iso-date';
 import type { Activity, Category } from '@/lib/types';
 import { useActivities } from '@/lib/use-activities';
 import { useCategories } from '@/lib/use-categories';
 import { useInstallPrompt } from '@/lib/use-install-prompt';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const GREETING_BY_HOUR = (hour: number) => {
   if (hour < 12) return 'Good morning';
@@ -25,6 +27,7 @@ const GREETING_BY_HOUR = (hour: number) => {
 };
 
 const SESSION_CATEGORY_COLORS = ['#0ea5e9', '#8b5cf6', '#14b8a6', '#f97316'];
+const DEMO_DISMISSED_KEY = 'sdt-demo-dismissed';
 
 type FormState =
   | { open: false }
@@ -52,6 +55,27 @@ export default function Home() {
 
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
+  const hasCheckedDemoRef = useRef(false);
+
+  // Seed sample activities once, only if there's genuinely nothing to show
+  // (no real Dexie data yet, nothing added this session) and the visitor
+  // hasn't cleared the demo before. Runs at most once per mount — re-adding
+  // and then deleting everything down to zero must NOT bring the demo back.
+  useEffect(() => {
+    if (hasCheckedDemoRef.current || dbActivities === undefined) return;
+    hasCheckedDemoRef.current = true;
+    if (dbActivities.length > 0) return;
+    if (localStorage.getItem(DEMO_DISMISSED_KEY) === '1') return;
+    setSessionActivities(buildDemoActivities(today));
+    setIsDemo(true);
+  }, [dbActivities, today]);
+
+  function handleClearDemo() {
+    setSessionActivities([]);
+    setIsDemo(false);
+    localStorage.setItem(DEMO_DISMISSED_KEY, '1');
+  }
 
   const now = new Date();
   const dateLabel = now.toLocaleDateString(undefined, {
@@ -131,6 +155,7 @@ export default function Home() {
       </header>
 
       {canInstall && <InstallBanner onInstall={install} onDismiss={dismiss} />}
+      {isDemo && <DemoBanner onClear={handleClearDemo} />}
 
       {activities === undefined || categories === undefined ? (
         <LoadingSkeleton />

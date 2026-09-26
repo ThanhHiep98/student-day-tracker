@@ -33,7 +33,7 @@ export function SidebarNav() {
   return (
     <nav
       aria-label="Primary"
-      className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col gap-1 border-r border-border bg-surface/60 px-3 py-6 sm:flex"
+      className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-border bg-surface/60 px-3 py-6 sm:flex"
     >
       <div className="mb-6 flex items-center gap-2 px-2">
         <span
@@ -49,12 +49,14 @@ export function SidebarNav() {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <title>Day Tracker</title>
+            <title>Student Day Tracker</title>
             <circle cx="10" cy="10" r="7" />
             <path d="M10 6v4l3 2" />
           </svg>
         </span>
-        <span className="text-sm font-semibold tracking-tight">Day Tracker</span>
+        <span className="min-w-0 text-sm leading-tight font-semibold tracking-tight">
+          Student Day Tracker
+        </span>
       </div>
 
       {TABS.map(({ href, label }) => {

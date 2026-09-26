@@ -9,6 +9,7 @@ import { expect, test } from '@playwright/test';
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('sdt-install-dismissed', '1');
+    localStorage.setItem('sdt-demo-dismissed', '1');
   });
 });
 
