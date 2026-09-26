@@ -10,9 +10,8 @@ const TABS = [
 ] as const;
 
 /**
- * Bottom tab bar for the three top-level sections from the requirement doc
- * (Home / History / Insights). Fixed to the viewport bottom on small screens,
- * matching the mobile-first layout implied by the mockups.
+ * Bottom tab bar for narrow viewports — the mobile counterpart to
+ * SidebarNav's left column (which takes over on `sm:` and up).
  */
 export function NavBar() {
   const pathname = usePathname();
@@ -20,7 +19,7 @@ export function NavBar() {
   return (
     <nav
       aria-label="Primary"
-      className="sticky bottom-0 z-10 border-t border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80"
+      className="sticky bottom-0 z-10 border-t border-border bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80 sm:hidden"
     >
       <ul className="mx-auto flex w-full max-w-2xl">
         {TABS.map(({ href, label }) => {

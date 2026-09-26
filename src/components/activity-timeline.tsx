@@ -5,6 +5,8 @@ import type { Activity, Category } from '@/lib/types';
 interface ActivityTimelineProps {
   activities: Activity[];
   categories: Category[];
+  onEdit?: (activity: Activity) => void;
+  onDelete?: (activity: Activity) => void;
 }
 
 function formatClock(minutes: number): string {
@@ -17,11 +19,15 @@ function formatClock(minutes: number): string {
  * Req. 1.2 "Today's Timeline" — the core of Home. Each row: icon, name,
  * category, start/end time, duration, edit/delete.
  *
- * Edit/delete are intentionally disabled placeholders here: this is the
- * environment scaffold, not the feature build. See CLAUDE.md — the
- * Implement agent wires these up from the plan produced by the Plan agent.
+ * Edit/Delete call back to the caller (`onEdit`/`onDelete`); omitting either
+ * prop renders it disabled — History reuses this component read-only.
  */
-export function ActivityTimeline({ activities, categories }: ActivityTimelineProps) {
+export function ActivityTimeline({
+  activities,
+  categories,
+  onEdit,
+  onDelete,
+}: ActivityTimelineProps) {
   if (activities.length === 0) {
     return <EmptyState />;
   }
@@ -60,19 +66,19 @@ export function ActivityTimeline({ activities, categories }: ActivityTimelinePro
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
-                  disabled
-                  aria-disabled
-                  title="Coming soon"
-                  className="rounded-full px-2 py-1 text-xs text-zinc-400 disabled:cursor-not-allowed"
+                  onClick={() => onEdit?.(activity)}
+                  disabled={!onEdit}
+                  title={onEdit ? undefined : 'Not available here'}
+                  className="rounded-full px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:text-zinc-400 disabled:hover:bg-transparent dark:text-zinc-400"
                 >
                   Edit
                 </button>
                 <button
                   type="button"
-                  disabled
-                  aria-disabled
-                  title="Coming soon"
-                  className="rounded-full px-2 py-1 text-xs text-zinc-400 disabled:cursor-not-allowed"
+                  onClick={() => onDelete?.(activity)}
+                  disabled={!onDelete}
+                  title={onDelete ? undefined : 'Not available here'}
+                  className="rounded-full px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:text-zinc-400 disabled:hover:bg-transparent dark:text-zinc-400"
                 >
                   Delete
                 </button>

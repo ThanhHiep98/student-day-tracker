@@ -14,3 +14,12 @@ for (const path of ['/', '/history', '/insights']) {
     expect(violations).toEqual([]);
   });
 }
+
+test('Home has no accessibility violations with the Add Activity dialog open', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ Add Activity' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect(violations).toEqual([]);
+});

@@ -1,4 +1,5 @@
 import { NavBar } from '@/components/nav-bar';
+import { SidebarNav } from '@/components/sidebar-nav';
 import { themeInitScript } from '@/lib/theme-init-script';
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
@@ -39,11 +40,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full">
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: inline script is required to run before hydration to prevent theme FOUC */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        {children}
-        <NavBar />
+        <div className="flex min-h-full">
+          <SidebarNav />
+          <div className="flex min-h-full flex-1 flex-col">
+            {children}
+            <NavBar />
+          </div>
+        </div>
       </body>
     </html>
   );
