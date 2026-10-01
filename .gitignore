@@ -70,3 +70,6 @@ Thumbs.db
 # Logs
 logs
 *.log
+
+# Firebase CLI cache (deploy/emulator state; never commit)
+.firebase/

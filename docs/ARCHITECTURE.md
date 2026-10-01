@@ -94,6 +94,32 @@ Built with **Serwist** (`@serwist/next`), the maintained successor to `next-pwa`
 Workbox-based service worker from `src/app/sw.ts` into `public/sw.js` at build time. Serwist
 needs webpack (not Turbopack), so `dev`/`build` pass `--webpack`.
 
+## Deploy
+
+**Firebase Hosting is the only deploy target** (`architecture/ADR-007-firebase.md`, slice F1 in
+`plans/2026-10-01-firebase-setup.html`). GitHub Pages is retired: there is no `basePath`, and
+the app is served from the domain root.
+
+- **What's served:** the static export in `out/` (`pnpm build`). `firebase.json` sets
+  `trailingSlash: true` (matching `next.config.ts`), so `/history` redirects to `/history/`, and
+  unknown paths get `404.html` with status 404. There is no SPA rewrite, because every route is
+  exported as its own `index.html`.
+- **Cache headers:** `/sw.js` is `no-cache`, so service-worker updates reach users.
+  `/_next/static/**` is `public, max-age=31536000, immutable`, because those files are
+  content-hashed.
+- **Workflows:** GitHub Actions runs typecheck, check, unit tests, and build, then
+  `FirebaseExtended/action-hosting-deploy`. A merge to `master` deploys to the live channel.
+  Each same-repo PR gets a preview channel (expires in 7 days), and its URL is posted as a PR
+  comment. The service-account secret is referenced by name only.
+  *(Pending: the workflows and `.firebaserc` land once the Firebase project exists. That is
+  phase B of the plan.)*
+- **Live URL:** `https://<projectId>.web.app` *(placeholder until the first deploy)*.
+- **Local check, no credentials:** `pnpm build && pnpm test:e2e:hosting` starts the Hosting
+  emulator (`pnpm emulators:hosting`, port 5002, fake project `demo-sdt`, no `firebase login`)
+  and runs `tests/e2e/hosting.spec.ts`. That spec checks routes, the redirect, the 404, cache
+  headers, the root-scoped manifest, and axe. To check a real preview/live URL instead, set
+  `PLAYWRIGHT_BASE_URL`. The default `pnpm test:e2e` ignores this spec.
+
 ## Insights visualization
 
 Requirement 3 explicitly avoids raw numbers ("Work = 20h") in favor of narrative ("bạn đang dành
@@ -119,6 +145,7 @@ No state library.
 | Integration | Vitest + `fake-indexeddb` | Dexie schema, indexes, and the default-category seed |
 | E2E | Playwright | Route rendering, nav between Home/History/Insights, calendar day selection |
 | Accessibility | `@axe-core/playwright` | Zero violations on all three routes |
+| Hosting | Playwright + Firebase Hosting emulator (`pnpm test:e2e:hosting`) | `firebase.json` routes, redirects, 404, cache headers, manifest scope |
 | Lighthouse | Local, on demand | Spot-check; no CI gate |
 
 Pure helpers get exhaustive unit tests because they're the brain of the app; everything else gets
