@@ -66,11 +66,25 @@ planning. Keep entries terse; don't restate what's already here.)*
 - Commit messages and code comments in English; product/requirement language stays in Vietnamese
   where the source docx is Vietnamese — don't translate `docs/REQUIREMENTS.md`'s quoted
   requirement text.
-- **Write-side pure builders throw synchronously on invalid input** (e.g. `addActivity`,
-  `addCategory` — empty name, `endMinutes <= startMinutes`, unknown/duplicate category); the UI
-  catches and shows the message inline, it never silently drops the input. Custom category names
-  are deduped case-insensitively against existing categories before insert. See
-  `plans/2026-09-26-add-activity.html`.
+- **Write-side pure builders are named `build*`, never `add*`** (`buildActivity`,
+  `buildUpdatedActivity`, `buildCategory` in `build-activity.ts` / `build-category.ts`): they
+  don't touch Dexie and receive `id`/`createdAt` as arguments; the caller does the `db.*` write.
+  They throw synchronously on invalid input (empty name, start = end time, invalid date,
+  unknown/duplicate category); the UI catches and shows the message inline, never silently drops
+  input. Custom category names are deduped case-insensitively against all categories.
+- **Pure helpers never read the clock** — `today`, `weekStart`, `monthStart` are passed in as
+  `IsoDate` args. Weeks are **Monday-start calendar weeks** (matching History), months are
+  calendar months.
+- **Demo rows are identified by an `id` prefix of `demo-`**, not by a schema field or a
+  localStorage id list; clearing demo data deletes only `demo-*` rows.
+- **Cross-midnight activities are stored as two per-day rows** sharing `spanId` (= the head row's
+  `id`; the tail row's id is `${headId}-next`). `startMinutes` is 0-1439; `endMinutes` is
+  end-exclusive 1-1440, where 1440 means "ends at midnight". Edit and delete always act on the
+  whole span in one Dexie `rw` transaction. Anything that counts sessions (not minutes) counts
+  distinct `spanId ?? id`. See `plans/2026-10-01-v2-roadmap-cross-midnight.html`.
+- **Per-user data from v2 on (goals, ratings, stickers) is keyed by `profileId`**, which is
+  `'local'` until the auth decision (D-A) lands, so that local profiles can be added later
+  without rewriting stores.
 
 ## Development workflow: Plan → Implement → Test
 

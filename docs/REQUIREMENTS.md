@@ -71,17 +71,64 @@ Click vào một activity cụ thể để xem phân tích chi tiết (lịch s�
 
 ## Data model implications
 
-- **Category**: `id, name, color, icon, isDefault` — 4 default categories seeded on first run
-  (`src/lib/default-categories.ts`); users can add more, can't delete the defaults.
-- **Activity**: `id, categoryId, name, date (YYYY-MM-DD), startMinutes, endMinutes` — one tracked
-  block of time. See `src/lib/types.ts` and `src/lib/db.ts`.
-- Aggregation (daily/weekly/monthly totals, category breakdowns) is pure logic over
-  `Activity[]` + `Category[]`, tested independently of Dexie — see `src/lib/get-daily-summary.ts`
-  for the pattern to extend for weekly/monthly (Insights).
+- **Category**: `id, name, color, icon, isDefault, createdAt` — 4 default categories seeded on
+  first run (`src/lib/default-categories.ts`). Users can add custom categories (`buildCategory`:
+  name deduped case-insensitively against all categories, color cycles through
+  `CUSTOM_CATEGORY_PALETTE`, icon 🏷️); renaming/deleting custom categories is not built yet.
+- **Activity**: `id, categoryId, name, date (YYYY-MM-DD), startMinutes, endMinutes, createdAt` —
+  one tracked block of time within a single day (`buildActivity` / `buildUpdatedActivity`). Demo
+  rows are identified by an `id` prefix of `demo-`. See `src/lib/types.ts` and `src/lib/db.ts`
+  (still `version(1)`).
+- Aggregation is pure logic over `Activity[]` + `Category[]`, tested independently of Dexie:
+  `get-daily-summary.ts` (Home/History), `get-weekly-summary.ts`, `compare-periods.ts`,
+  `build-insight-cards.ts`, `get-monthly-summary.ts`, `get-activity-analytics.ts` (Insights).
 
-## Out of scope for the environment scaffold
+## Shipped behaviour (defaults chosen while building sections 1–3)
 
-The current `src/` tree is a **skeleton**: routing, data schema, and the read path (today's
-activities, month calendar, empty states) work; write flows (add/edit/delete activity, custom
-categories) and all of Insights' charts/comparisons/cards are intentionally left as placeholders.
-Building those out is the Plan → Implement → Test agent workflow's job — see `CLAUDE.md`.
+Interim defaults from `plans/2026-09-26-add-activity.html` §2.2 — revisit there if they change.
+
+| # | Topic | Current behaviour |
+|---|---|---|
+| D1 | Insight cards (§3.3) | 4 cards for the current week, each hidden below its threshold: *Your week* (total > 0), *Your routine* (≥3 sessions in the same 3-hour slot), *Your pattern* (≥2 tracked days), *Consistency* (≥3 days) |
+| D2 | Not enough data | Compare shows a note instead of numbers when last week's matching days are empty; a category new this week is labelled "new this week"; no qualifying card → "track a few more days" |
+| D3 | Week / month | Mon–Sun calendar week (matches History); Compare = this week so far vs. the same weekdays last week; Monthly and Analytics = this month up to today |
+| D4 | Custom categories | Create only (no rename/delete) |
+| D5 | Overlap / midnight | Overlapping activities allowed; an activity can't cross midnight — **superseded by §4** (cross-midnight fix, v2 slice 1, not built yet) |
+| D6 | Default categories | Work, Study, Exercise, Entertainment (no "Other") |
+| D7 | Demo data | Seeded with `demo-` ids and counted in Insights while present (banner shown); "Clear & start fresh" deletes only demo rows |
+
+## 4. Yêu cầu bổ sung (v2)
+
+> Source: [`requirement/Requirement.txt`](../requirement/Requirement.txt) (added 2026-10-01; quoted
+> verbatim, not translated). Roadmap, ordering, and open decisions:
+> [`plans/2026-10-01-v2-roadmap-cross-midnight.html`](../plans/2026-10-01-v2-roadmap-cross-midnight.html).
+
+```
+Người dùng ở đây là học sinh và đang tham gia quá trình thi Đại học. Hãy hỗ trợ để phát triển 1 app có thể hỗ trợ gợi ý cho học sinh và phụ huynh
+
+- Cho quyền add thêm các sticker nhãn dán, hãy tham khảo facebook để phát triển tính năng này.
+- Fix bug: Khi nhập activity từ 21:00 của ngày hôm trước đến 1:00 hôm sau không được
+- Tạo User và đăng nhập.
+- Ở lần đầu tiên, đưa ra các gợi ý đề habit của người sử dụng app (ví dụ: mong muốn ngủ bao nhiêu tiếng ban đêm, thời gian bắt đầu ngủ, đi học, giải trí, các vấn đề khác), đặt khoảng 5 câu hỏi.
+- Với những thông tin được User cung cấp thì sẽ đưa ra cảnh báo nếu activity cảu User đang vi phạm. Đưa ra nhận xét cho người dùng.
+vd: 1 ngày nhu cầu cần học bao nhiêu (bao nhiêu thời gian trên trường, bao nhiêu thời gian học thêm, bao nhiêu tgian tự học; ăn trong bao lâu, giải trí, ngủ, các vấn đề khác...)
+Khi học sinh đăng nhập sẽ dựa vào chuẩn đầu vào tính % hiệu quả đưa ra nhận xét
+- Đánh giá mức độ hài lòng trong ngày
+```
+
+Notes:
+- The cross-midnight bug fix **overrides** decision D5 ("activities can't cross midnight") from
+  `plans/2026-09-26-add-activity.html`.
+- "Tạo User và đăng nhập" conflicts with ADR-001 (no backend, no auth). It is an open user
+  decision (D-A in the v2 roadmap plan) and is not decided yet.
+
+## Status
+
+Sections 1–3 (Home, History, Insights, including the add/edit/delete write flows and custom
+categories) shipped on 2026-10-01 via `plans/2026-09-26-add-activity.html`. Known gap: §3.4's
+"xu hướng" (trend) is not shown yet — Analytics lists sessions, average, longest and most common
+time slot only.
+
+Section 4 is being delivered one slice at a time through the Plan → Implement → Test workflow
+(see `CLAUDE.md`). As of 2026-10-01 none of it is built: slice 1 (cross-midnight) is planned and
+unblocked; decisions D-A (login) and D-B (goal ↔ category mapping) are still open.
