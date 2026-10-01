@@ -7,6 +7,8 @@ consequences.
 
 ## ADR-001: Dexie (IndexedDB) instead of a backend
 
+**Status:** Superseded by [ADR-007](../architecture/ADR-007-firebase.md) (2026-10-01).
+
 **Context:** A day-activity tracker is a natural excuse to build a backend — accounts, auth,
 multi-device sync, reminders. The question is whether a backend earns its weight for a
 single-device student tool.
@@ -148,3 +150,11 @@ automatically. No store.
 - ✅ Faster installs than npm, disk-efficient via content-addressable storage.
 - ✅ Strict dependency resolution catches phantom dependencies.
 - ⚠️ Some legacy tools assume npm. Not hit so far.
+
+---
+
+## ADR-007: Firebase for auth, sync, hosting, and AI
+
+Moved to its own file: [`architecture/ADR-007-firebase.md`](../architecture/ADR-007-firebase.md)
+(includes use-case and activity diagrams). New ADRs from ADR-007 on live in `architecture/` as one
+`.md` file each.

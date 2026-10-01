@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Plan: firebase-setup</title>
+<style>
+  body { font: 15px/1.5 -apple-system, system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; color: #18181b; }
+  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
+  .meta { color: #71717a; font-size: .85rem; margin-bottom: 1.5rem; }
+  h2 { font-size: 1rem; margin-top: 2rem; border-bottom: 1px solid #e4e4e7; padding-bottom: .3rem; }
+  h3 { font-size: .95rem; margin-top: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; margin-top: .75rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #e4e4e7; vertical-align: top; }
+  th { color: #52525b; font-weight: 600; }
+  code { background: #f4f4f5; padding: .1rem .35rem; border-radius: 4px; font-size: .85em; }
+  pre { background: #f4f4f5; padding: .6rem .8rem; border-radius: 6px; font-size: .82rem; overflow-x: auto; }
+  .risk-low { color: #16a34a; } .risk-med { color: #d97706; } .risk-high { color: #dc2626; }
+  .now { color: #15803d; font-weight: 600; } .wait { color: #b45309; font-weight: 600; }
+  ul.checklist { list-style: none; padding-left: 0; }
+  ul.checklist li { padding: .25rem 0; }
+  ol.user li { padding: .35rem 0; }
+  .box { border: 1px solid #fcd34d; background: #fffbeb; border-radius: 8px; padding: .5rem 1rem; margin-top: .75rem; }
+  .user-box { border: 1px solid #93c5fd; background: #eff6ff; border-radius: 8px; padding: .5rem 1.25rem 1rem; margin-top: .75rem; }
+  .never { color: #b91c1c; font-weight: 600; }
+  svg { max-width: 100%; }
+</style>
+</head>
+<body>
+  <h1>Plan: Firebase setup &mdash; user console steps + F1 Hosting &amp; CI</h1>
+  <p class="meta">2026-10-01 &middot; decision: architecture/ADR-007-firebase.md (supersedes ADR-001 in docs/DECISIONS.md; resolves D-A; use-case + activity diagrams there) &middot; roadmap: plans/2026-10-01-v2-roadmap-cross-midnight.html &middot; requirement: requirement/Requirement.txt (&ldquo;Tạo User và đăng nhập&rdquo;), docs/REQUIREMENTS.md &sect;4 &middot; <strong>F1 phase A: implementer can run now</strong> &middot; F1 phase B waits for the user's &ldquo;done&rdquo;</p>
+
+  <h2>Scope</h2>
+  <p>ADR-007 is split into three sub-slices. <strong>F1 is planned in full here:</strong> serve the existing static export
+  from Firebase Hosting, deploy from GitHub Actions (live on merge to <code>master</code>, a preview channel per PR), and
+  retire GitHub Pages. F1 does not use the Firebase SDK and has no runtime behaviour change, so the app stays
+  Dexie-backed. F2 (Auth + Firestore + migration + rules) and F3 (AI comments) are only scoped here. Each gets its own
+  plan later. Everything stays on the <strong>Spark</strong> plan (no billing). Hosting, preview channels, custom
+  domains, Google sign-in, Firestore, and AI Logic with the Gemini Developer API all work without billing.
+  <strong>Not in F1:</strong> the Firebase JS SDK, sign-in, Firestore, App Check, and AI.</p>
+
+  <h2>Order: cross-midnight (slice 1) before the Firestore migration? Confirmed: yes</h2>
+  <table>
+    <tr><th>Sequence</th><th>Why</th></tr>
+    <tr><td><strong>Slice 1 &parallel; F1</strong> &rarr; F2 &rarr; slices 2, 3, 4 &rarr; F3 &rarr; 5, 6</td><td>
+      (1) Data moves to Firestore once, already in its final shape (<code>spanId</code>, end 1&ndash;1440). Without Cloud Functions, a later shape change would need a client-side migration of every user's cloud data.
+      (2) Slice 1 is planned and unblocked, while F2 is blocked on the user, so doing slice 1 first loses no time.
+      (3) F1 touches only deploy config, so it runs in parallel with slice 1 and doesn't conflict.
+      (4) Slices 2&ndash;4 come after F2, so their new stores (profile, ratings) are written once, directly in Firestore under <code>users/{uid}</code>, not built in Dexie and then ported.
+      (5) F3 comes after slice 4 because slice 4's rule-based comments <em>are</em> F3's offline/over-quota fallback.</td></tr>
+    <tr><td>Cost of this order</td><td>Slice 1 adds a Dexie <code>version(2)</code> index that F2 later throws away. It is one line and needs no upgrade function, so the cost is small.</td></tr>
+  </table>
+
+  <h2>Sub-slices</h2>
+  <table>
+    <tr><th>#</th><th>Sub-slice</th><th>Needs from user</th><th>Tester verifies without credentials via</th></tr>
+    <tr><td><strong>F1</strong></td><td>Firebase Hosting + GitHub Actions deploy/preview; retire GitHub Pages (planned below)</td><td>U1 (project ID), U7 (CLI login + <code>init hosting:github</code>). <em>Not</em> the web config.</td><td>Hosting emulator with project <code>demo-sdt</code> + Playwright <code>hosting.spec.ts</code>. The live/preview URL is public, so checking it needs no credentials either.</td></tr>
+    <tr><td>F2</td><td>Google sign-in, Firestore (offline persistence) replacing Dexie, one-time Dexie &rarr; Firestore migration, Security Rules</td><td>U2&ndash;U4 (web config, Google provider, Firestore DB)</td><td>Auth + Firestore emulators (<code>demo-sdt</code>), <code>@firebase/rules-unit-testing</code>, E2E signs in with an emulator fake Google account. Needs <strong>JDK 21</strong> (not installed in this environment).</td></tr>
+    <tr><td>F3</td><td>AI comments via Firebase AI Logic &rarr; Gemini Developer API, App Check, consent screen, &le;1 call/user/day cache, rule-based fallback</td><td>U5&ndash;U6 (AI Logic enabled, reCAPTCHA site key); a debug token only for a manual real-call smoke test</td><td>An injectable AI client is mocked in unit/E2E tests. Prompt-builder tests prove that only aggregated numbers are sent. No real Gemini call in CI.</td></tr>
+  </table>
+
+  <h2>Bước người dùng cần tự làm (User steps &mdash; Vietnamese)</h2>
+  <div class="user-box">
+  <p>Những bước này cần tài khoản Google/GitHub của bạn, nên AI không làm thay được. Bạn có thể làm hết ngay bây giờ.
+  Cột &ldquo;Mở khoá&rdquo; cho biết bước nào mở khoá phần việc nào. Làm xong, hãy nhắn: <strong>&ldquo;xong U1&ndash;U7&rdquo;</strong> (hoặc các bước đã xong) kèm các giá trị cần gửi. Nếu menu console khác mô tả, hãy dùng ô tìm kiếm trên console để tìm theo tên sản phẩm.</p>
+  <p class="never">Tuyệt đối KHÔNG gửi cho chúng tôi: mật khẩu, file JSON service account, giá trị GitHub secret, reCAPTCHA secret key, App Check debug token, Gemini API key. Các bước này cũng không bao giờ cần bấm &ldquo;Upgrade&rdquo; lên gói Blaze.</p>
+  <ol class="user">
+    <li><strong>U1 &middot; Tạo project (mở khoá F1).</strong> Vào <code>console.firebase.google.com</code> &rarr; <em>Create a project</em> &rarr; đặt tên (vd. <code>student-day-tracker</code>) &rarr; <strong>tắt</strong> Google Analytics &rarr; <em>Create project</em>. Góc dưới menu trái phải ghi <strong>Spark</strong>. Không bấm Upgrade.<br/>
+      &#10148; <em>Gửi lại:</em> <strong>Project ID</strong> (vd. <code>student-day-tracker-ab12c</code>, xem ở &#9881; Project settings &rarr; General).</li>
+    <li><strong>U2 &middot; Đăng ký Web app (mở khoá F2).</strong> &#9881; <em>Project settings</em> &rarr; <em>General</em> &rarr; <em>Your apps</em> &rarr; biểu tượng <code>&lt;/&gt;</code> (Web) &rarr; nickname <code>sdt-web</code> &rarr; không cần tick &ldquo;Also set up Firebase Hosting&rdquo; &rarr; <em>Register app</em>.<br/>
+      &#10148; <em>Gửi lại:</em> đối tượng <code>firebaseConfig</code> với đúng 6 trường: <code>apiKey</code>, <code>authDomain</code>, <code>projectId</code>, <code>storageBucket</code>, <code>messagingSenderId</code>, <code>appId</code>. Các giá trị này <strong>không bí mật</strong> (chúng nằm sẵn trong mã JS của mọi web Firebase, và việc bảo vệ dữ liệu là do Security Rules). Không cần <code>measurementId</code>.</li>
+    <li><strong>U3 &middot; Bật đăng nhập Google (mở khoá F2).</strong> <em>Build &rarr; Authentication</em> &rarr; <em>Get started</em> &rarr; tab <em>Sign-in method</em> &rarr; <em>Google</em> &rarr; <em>Enable</em> &rarr; chọn <em>Project support email</em> &rarr; <em>Save</em>. Sau đó mở tab <em>Settings &rarr; Authorized domains</em> và kiểm tra đã có <code>localhost</code>, <code>&lt;projectId&gt;.firebaseapp.com</code>, <code>&lt;projectId&gt;.web.app</code>.<br/>
+      &#10148; <em>Gửi lại:</em> chỉ cần xác nhận &ldquo;đã bật Google&rdquo;.</li>
+    <li><strong>U4 &middot; Tạo Firestore (mở khoá F2).</strong> <em>Build &rarr; Firestore Database</em> &rarr; <em>Create database</em> &rarr; Edition: <strong>Standard</strong> &rarr; Database ID: giữ <strong><code>(default)</code></strong> (chỉ database mặc định được miễn phí) &rarr; Location: <strong><code>asia-southeast1 (Singapore)</code></strong>. Vị trí này <strong>không đổi được</strong> sau khi tạo &rarr; chọn <strong>Start in production mode</strong> (khoá toàn bộ cho tới khi chúng tôi deploy rules) &rarr; <em>Create</em>.<br/>
+      &#10148; <em>Gửi lại:</em> xác nhận &ldquo;Standard, (default), asia-southeast1, production mode&rdquo;.</li>
+    <li><strong>U5 &middot; Bật Firebase AI Logic (mở khoá F3).</strong> Menu <em>AI &rarr; AI Logic</em> (hoặc tìm &ldquo;AI Logic&rdquo;) &rarr; <em>Get started</em> &rarr; chọn <strong>Gemini Developer API</strong> (<strong>không</strong> chọn &ldquo;Vertex AI Gemini API&rdquo; vì cái đó cần Blaze) &rarr; <em>Enable API</em>. Console sẽ tự tạo một Gemini API key trong project. Không cần copy key đó.<br/>
+      &#10148; <em>Gửi lại:</em> xác nhận &ldquo;đã bật Gemini Developer API&rdquo;.</li>
+    <li><strong>U6 &middot; Đăng ký App Check (mở khoá F3).</strong> <em>Build &rarr; App Check</em> &rarr; <em>Get started</em> &rarr; tab <em>Apps</em> &rarr; chọn web app <code>sdt-web</code>. Provider khuyến nghị cho gói Spark là <strong>reCAPTCHA v3</strong> (miễn phí, không cần billing). Tạo key tại <code>google.com/recaptcha/admin</code>: loại <em>Score based (v3)</em>, domains gồm <code>&lt;projectId&gt;.web.app</code>, <code>&lt;projectId&gt;.firebaseapp.com</code> và tên miền riêng nếu có. Dán <strong>secret key</strong> vào ô của Firebase App Check rồi <em>Save</em>. Nếu console chỉ cho chọn <em>reCAPTCHA Enterprise</em> mà không đòi liên kết billing thì chọn nó cũng được. Nếu bị đòi billing, hãy <strong>dừng lại và báo chúng tôi</strong>. <strong>Chưa bấm &ldquo;Enforce&rdquo;</strong> cho bất kỳ dịch vụ nào, vì bật sớm sẽ chặn chính app. Chúng tôi sẽ báo khi nào cần bật.<br/>
+      &#10148; <em>Gửi lại:</em> <strong>reCAPTCHA site key</strong> (khoá công khai). <span class="never">Không gửi secret key.</span></li>
+    <li><strong>U7 &middot; Đăng nhập CLI và nối GitHub (mở khoá F1 phần B).</strong> Mở một <strong>terminal WSL riêng</strong>, vì đây là lệnh tương tác và có thể không nhập được qua <code>!</code> trong phiên Claude. <code>cd</code> vào thư mục repo rồi chạy:
+<pre>npx -y firebase-tools@latest login            # nếu trình duyệt không tự mở: thêm --no-localhost
+npx -y firebase-tools@latest init hosting:github</pre>
+      Trả lời các câu hỏi: <em>Use an existing project</em> &rarr; chọn project ở U1 &middot; uỷ quyền GitHub trên trình duyệt &middot; repo <code>ThanhHiep98/student-day-tracker</code> &middot; &ldquo;run a build script before every deploy?&rdquo; &rarr; <strong>No</strong> (chúng tôi tự thêm bước build bằng pnpm) &middot; &ldquo;automatic deployment &hellip; when a PR is merged?&rdquo; &rarr; <strong>Yes</strong>, branch <code>master</code>. Nếu được hỏi public directory thì nhập <code>out</code>, &ldquo;single-page app&rdquo; &rarr; <strong>No</strong>, và mọi câu &ldquo;overwrite&rdquo; &rarr; <strong>No</strong>. <strong>Không commit/push</strong> các file vừa sinh ra vì chúng tôi sẽ chỉnh rồi commit.<br/>
+      &#10148; <em>Gửi lại:</em> <strong>tên</strong> GitHub secret vừa được tạo (xem tại GitHub repo &rarr; <em>Settings &rarr; Secrets and variables &rarr; Actions</em>, dạng <code>FIREBASE_SERVICE_ACCOUNT_&lt;PROJECT_ID&gt;</code>). Chỉ gửi tên, <span class="never">không gửi giá trị</span>.</li>
+    <li><strong>U8 &middot; (Tuỳ chọn, lúc nào cũng được) Tên miền riêng.</strong> Mua tên miền &rarr; <em>Build &rarr; Hosting</em> &rarr; <em>Add custom domain</em> &rarr; nhập tên miền &rarr; thêm đúng các bản ghi DNS (TXT, A) mà Firebase hiển thị vào trang quản lý DNS của nhà cung cấp &rarr; chờ trạng thái <em>Connected</em> (SSL có thể mất tới 24h) &rarr; vào <em>Authentication &rarr; Settings &rarr; Authorized domains</em>, thêm tên miền nếu chưa có &rarr; thêm tên miền vào reCAPTCHA key (U6). Trước khi có tên miền, app chạy ở <code>https://&lt;projectId&gt;.web.app</code>.<br/>
+      &#10148; <em>Gửi lại:</em> tên miền.</li>
+    <li><strong>U9 &middot; (Sau khi F1 chạy trên web.app) Gỡ GitHub Pages.</strong> Trước tiên hãy trả lời câu hỏi: <strong>bạn có dữ liệu thật trên bản GitHub Pages (<code>thanhhiep98.github.io/student-day-tracker</code>) không?</strong> Dữ liệu nằm trong trình duyệt theo từng tên miền, nên web.app <em>không</em> đọc được dữ liệu của github.io. Nếu không có dữ liệu thật: GitHub repo &rarr; <em>Settings &rarr; Pages</em> &rarr; <em>Unpublish site</em>.<br/>
+      &#10148; <em>Gửi lại:</em> &ldquo;có/không có dữ liệu thật trên GitHub Pages&rdquo;.</li>
+  </ol>
+  </div>
+
+  <h2>F1 &mdash; Requirements</h2>
+  <table>
+    <tr><th>Source</th><th>User-visible behavior</th><th>Acceptance check</th></tr>
+    <tr><td>ADR-007 Hosting</td><td>The app is served at the domain root (<code>https://&lt;projectId&gt;.web.app/</code>, later the custom domain). It has the same three routes and works offline after the first load (PWA).</td><td><code>/</code>, <code>/history/</code>, <code>/insights/</code> return 200 with their headings. <code>/history</code> redirects to <code>/history/</code>. An unknown path returns the 404 page.</td></tr>
+    <tr><td>ADR-007 Hosting (PWA)</td><td>Updates reach users: the service worker is never cached long-term, and hashed assets are cached forever.</td><td><code>/sw.js</code> has <code>Cache-Control: no-cache</code>. <code>/_next/static/**</code> has <code>max-age=31536000, immutable</code>. The manifest's <code>start_url</code> and <code>scope</code> are <code>/</code>.</td></tr>
+    <tr><td>ADR-007 CI</td><td>Merging to <code>master</code> deploys live. Every same-repo PR gets a preview URL commented on it. Nothing deploys if checks fail.</td><td>The workflows run typecheck, check, unit tests, and build before <code>action-hosting-deploy</code>. A PR shows the bot comment with its preview URL.</td></tr>
+    <tr><td>ADR-007 (replaces GitHub Pages)</td><td>There is one deploy target, so two copies of the app no longer drift apart.</td><td><code>deploy.yml</code> and every <code>GITHUB_PAGES</code>/<code>basePath</code> reference are gone.</td></tr>
+  </table>
+
+  <h2>F1 &mdash; Flow</h2>
+  <svg viewBox="0 0 700 200" role="img" aria-label="PR or merge triggers GitHub Actions checks and build, producing out/, deployed by action-hosting-deploy to a preview channel or live web.app; locally out/ is served by the hosting emulator and tested by Playwright">
+    <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#52525b"/></marker></defs>
+    <g font-size="12" font-family="system-ui, sans-serif" fill="#18181b">
+      <rect x="5" y="20" width="110" height="56" rx="8" fill="#f4f4f5" stroke="#a1a1aa"/>
+      <text x="60" y="44" text-anchor="middle">PR / merge</text><text x="60" y="62" text-anchor="middle" font-size="10">to master</text>
+      <rect x="140" y="20" width="160" height="56" rx="8" fill="#ecfdf5" stroke="#16a34a"/>
+      <text x="220" y="44" text-anchor="middle">GitHub Actions</text><text x="220" y="62" text-anchor="middle" font-size="10">typecheck · check · test · build</text>
+      <rect x="325" y="20" width="100" height="56" rx="8" fill="#f4f4f5" stroke="#a1a1aa"/>
+      <text x="375" y="44" text-anchor="middle">out/</text><text x="375" y="62" text-anchor="middle" font-size="10">static export</text>
+      <rect x="450" y="20" width="110" height="56" rx="8" fill="#fffbeb" stroke="#d97706"/>
+      <text x="505" y="40" text-anchor="middle">hosting-deploy</text><text x="505" y="56" text-anchor="middle" font-size="10">secret from U7</text><text x="505" y="69" text-anchor="middle" font-size="10">.firebaserc (U1)</text>
+      <rect x="585" y="20" width="110" height="56" rx="8" fill="#eff6ff" stroke="#2563eb"/>
+      <text x="640" y="40" text-anchor="middle">PR: preview</text><text x="640" y="56" text-anchor="middle" font-size="10">master: live</text><text x="640" y="69" text-anchor="middle" font-size="10">&lt;id&gt;.web.app (+U8)</text>
+      <rect x="325" y="120" width="180" height="56" rx="8" fill="#ecfdf5" stroke="#16a34a"/>
+      <text x="415" y="144" text-anchor="middle">Hosting emulator :5002</text><text x="415" y="162" text-anchor="middle" font-size="10">firebase.json · project demo-sdt</text>
+      <rect x="530" y="120" width="165" height="56" rx="8" fill="#ecfdf5" stroke="#16a34a"/>
+      <text x="612" y="144" text-anchor="middle">Playwright</text><text x="612" y="162" text-anchor="middle" font-size="10">hosting.spec.ts (no creds)</text>
+      <text x="5" y="150" font-size="11" fill="#52525b">local / tester lane (runnable now)</text>
+    </g>
+    <g stroke="#52525b" stroke-width="1.5" fill="none" marker-end="url(#a)">
+      <line x1="115" y1="48" x2="138" y2="48"/><line x1="300" y1="48" x2="323" y2="48"/><line x1="425" y1="48" x2="448" y2="48"/><line x1="560" y1="48" x2="583" y2="48"/>
+      <line x1="375" y1="76" x2="375" y2="118"/><line x1="505" y1="148" x2="528" y2="148"/>
+    </g>
+  </svg>
+
+  <h2>F1 &mdash; Tasks</h2>
+  <p><span class="now">NOW</span> = runnable before the user finishes. <span class="wait">WAIT</span> = blocked on the listed user step.
+  Phase A can be built and graded on a branch. <strong>It must not merge to <code>master</code> before phase B</strong>, because deleting <code>deploy.yml</code> without the Firebase workflows would leave the repo with no deploy.</p>
+  <table>
+    <tr><th>Phase</th><th>Gate</th><th>Step</th><th>File(s)</th><th>Depends on</th><th>Risk</th></tr>
+    <tr><td>A1</td><td class="now">NOW</td><td>Add <code>firebase-tools</code> (pinned) as a devDependency. Scripts: <code>emulators:hosting</code> = <code>firebase emulators:start --only hosting --project demo-sdt</code>, <code>test:e2e:hosting</code> = <code>playwright test -c playwright.hosting.config.ts</code>.</td><td><code>package.json</code>, <code>pnpm-lock.yaml</code></td><td>&mdash;</td><td class="risk-low">Low</td></tr>
+    <tr><td>A2</td><td class="now">NOW</td><td><code>firebase.json</code>: <code>hosting.public: "out"</code>, <code>trailingSlash: true</code> (matches <code>next.config.ts</code>), <code>ignore</code> dotfiles, headers (<code>/sw.js</code> &rarr; <code>no-cache</code>; <code>/_next/static/**</code> &rarr; <code>public, max-age=31536000, immutable</code>). <code>emulators.hosting.port: 5002</code>, <code>emulators.ui.enabled: false</code>. No SPA rewrite, because every route is exported as its own <code>index.html</code>.</td><td><code>firebase.json</code> (new)</td><td>&mdash;</td><td class="risk-low">Low</td></tr>
+    <tr><td>A3</td><td class="now">NOW</td><td>Drop the GitHub Pages <code>basePath</code>: remove <code>isGithubPages</code>/<code>basePath</code> from <code>next.config.ts</code> and the prefix from <code>manifest.ts</code> (<code>start_url</code>/<code>scope</code> become <code>/</code>). Update the comments to say Firebase Hosting serves from the root.</td><td><code>next.config.ts</code>, <code>src/app/manifest.ts</code></td><td>&mdash;</td><td class="risk-low">Low</td></tr>
+    <tr><td>A4</td><td class="now">NOW</td><td>Add <code>playwright.hosting.config.ts</code>: <code>testMatch: 'hosting.spec.ts'</code>, <code>baseURL: http://localhost:5002</code>, <code>webServer.command: pnpm emulators:hosting</code>. It serves the existing <code>out/</code>, so run <code>pnpm build</code> first. Add <code>testIgnore: 'hosting.spec.ts'</code> to <code>playwright.config.ts</code>.</td><td><code>playwright.hosting.config.ts</code> (new), <code>playwright.config.ts</code></td><td>A1, A2</td><td class="risk-med">Med (if the CLI insists on Java even for hosting-only, install JDK 21 and note it)</td></tr>
+    <tr><td>A5</td><td class="now">NOW</td><td><code>tests/e2e/hosting.spec.ts</code>: three routes return 200 with their headings, <code>/history</code> redirects to <code>/history/</code>, an unknown path returns 404, cache headers on <code>/sw.js</code> and on one <code>/_next/static</code> asset taken from the page, manifest <code>start_url === '/'</code>, and 0 axe violations on hosted <code>/</code>.</td><td><code>tests/e2e/hosting.spec.ts</code> (new)</td><td>A4</td><td class="risk-low">Low</td></tr>
+    <tr><td>A6</td><td class="now">NOW</td><td>Delete the GitHub Pages workflow (on the branch only, see the merge note above).</td><td><code>.github/workflows/deploy.yml</code></td><td>A3</td><td class="risk-low">Low</td></tr>
+    <tr><td>A7</td><td class="now">NOW</td><td>Docs: <code>ARCHITECTURE.md</code> gets a &ldquo;Deploy&rdquo; section (Firebase Hosting, workflows, preview channels, <code>pnpm test:e2e:hosting</code>). README swaps GitHub Pages for Firebase Hosting, with a placeholder URL until B3.</td><td><code>docs/ARCHITECTURE.md</code>, <code>README.md</code></td><td>A1&ndash;A6</td><td class="risk-low">Low</td></tr>
+    <tr><td>B1</td><td class="wait">WAIT U1+U7</td><td>Check that <code>.firebaserc</code> (written by the user's <code>init</code>) has <code>projects.default = &lt;projectId&gt;</code>. Check that <code>firebase.json</code> still matches A2: if <code>init</code> merged its own defaults, restore A2.</td><td><code>.firebaserc</code>, <code>firebase.json</code></td><td>A2</td><td class="risk-low">Low</td></tr>
+    <tr><td>B2</td><td class="wait">WAIT U7</td><td>Rewrite the two generated workflows. Steps: checkout &rarr; <code>pnpm/action-setup@v4</code> &rarr; <code>setup-node</code> 22 with pnpm cache &rarr; <code>pnpm install --frozen-lockfile</code> &rarr; <code>typecheck</code>, <code>check</code>, <code>test --run</code>, <code>build</code> &rarr; <code>FirebaseExtended/action-hosting-deploy@v0</code>, keeping the generated <code>firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_… }}</code> and <code>projectId</code>. Merge workflow: <code>channelId: live</code> + <code>concurrency</code>. PR workflow: <code>expires: 7d</code>, skip forks (<code>if: github.event.pull_request.head.repo.full_name == github.repository</code>), permissions <code>checks: write, contents: read, pull-requests: write</code>.</td><td><code>.github/workflows/firebase-hosting-merge.yml</code>, <code>firebase-hosting-pull-request.yml</code></td><td>B1, A6</td><td class="risk-med">Med</td></tr>
+    <tr><td>B3</td><td class="wait">WAIT B2 + user OK to push</td><td>Commit on a branch and open a PR. Confirm the bot posts a working preview URL. After merge, confirm the live URL <code>https://&lt;projectId&gt;.web.app</code>. Then run <code>hosting.spec.ts</code> against the preview/live URL (<code>PLAYWRIGHT_BASE_URL</code> override; no webServer).</td><td>&mdash;</td><td>B2</td><td class="risk-med">Med</td></tr>
+    <tr><td>B4</td><td class="wait">WAIT B3 (+U8, U9)</td><td>Put the live URL (and custom domain if U8 is done) in the README/ARCHITECTURE. Record the user's U9 answer. If real data exists on github.io, add an F2 task: a one-off JSON export on the old origin, then import on the new one.</td><td><code>README.md</code>, <code>docs/ARCHITECTURE.md</code></td><td>B3</td><td class="risk-low">Low</td></tr>
+  </table>
+
+  <h2>F1 &mdash; Testing strategy</h2>
+  <table>
+    <tr><th>Layer</th><th>What it proves</th><th>File</th></tr>
+    <tr><td>Unit / typecheck / lint</td><td>Removing <code>basePath</code> breaks nothing. The existing suite stays green.</td><td>existing <code>src/**/*.test.ts</code></td></tr>
+    <tr><td>Build</td><td><code>out/</code> contains <code>index.html</code>, <code>history/index.html</code>, <code>insights/index.html</code>, <code>404.html</code>, <code>sw.js</code>, <code>manifest.webmanifest</code>. No <code>/student-day-tracker</code> string remains in <code>out/</code>.</td><td><code>pnpm build</code> + <code>grep -r student-day-tracker/ out/</code> (should find nothing)</td></tr>
+    <tr><td>E2E (hosting emulator, no credentials)</td><td><code>firebase.json</code> behaves as specified: routes, trailing-slash redirect, 404, cache headers, root-scoped manifest.</td><td><code>tests/e2e/hosting.spec.ts</code> via <code>pnpm build &amp;&amp; pnpm test:e2e:hosting</code></td></tr>
+    <tr><td>E2E (dev server)</td><td>The existing smoke, add-activity, insights, and a11y specs still pass.</td><td><code>pnpm test:e2e</code></td></tr>
+    <tr><td>a11y</td><td>The hosted build has 0 axe violations on <code>/</code>, the same as dev.</td><td><code>tests/e2e/hosting.spec.ts</code></td></tr>
+    <tr><td>Live (after B3, public URL, no credentials)</td><td>The real deploy matches the emulator, and the PR preview channel works.</td><td><code>hosting.spec.ts</code> with <code>PLAYWRIGHT_BASE_URL</code></td></tr>
+  </table>
+
+  <h2>F1 &mdash; Success criteria</h2>
+  <h3>Gradeable now (phase A, no credentials)</h3>
+  <ul class="checklist">
+    <li>&#9744; <code>pnpm typecheck</code>, <code>pnpm check</code>, <code>pnpm test</code>, <code>pnpm build</code>, <code>pnpm test:e2e</code> all pass.</li>
+    <li>&#9744; <code>pnpm build &amp;&amp; pnpm test:e2e:hosting</code> passes against the hosting emulator with project <code>demo-sdt</code>, and no <code>firebase login</code> is needed.</li>
+    <li>&#9744; Hosted <code>/</code>, <code>/history/</code>, <code>/insights/</code> return 200. <code>/history</code> redirects to <code>/history/</code>. An unknown path returns 404.</li>
+    <li>&#9744; <code>/sw.js</code> returns <code>Cache-Control: no-cache</code>. A <code>/_next/static/</code> asset returns <code>max-age=31536000, immutable</code>.</li>
+    <li>&#9744; The manifest <code>start_url</code> and <code>scope</code> are <code>/</code>, and <code>out/</code> contains no <code>/student-day-tracker/</code> prefix.</li>
+    <li>&#9744; No <code>GITHUB_PAGES</code> or <code>basePath</code> reference remains in <code>src/</code> or <code>next.config.ts</code>, and <code>.github/workflows/deploy.yml</code> is deleted.</li>
+    <li>&#9744; <code>playwright.config.ts</code> ignores <code>hosting.spec.ts</code>, so the default E2E run doesn't need the emulator.</li>
+    <li>&#9744; 0 axe violations on hosted <code>/</code> and on all routes in the dev run.</li>
+    <li>&#9744; No Firebase SDK in <code>package.json</code> dependencies (F1 is deploy-only). No secrets, service-account JSON, or tokens are committed.</li>
+  </ul>
+  <h3>Gradeable after the user's &ldquo;done&rdquo; (phase B)</h3>
+  <ul class="checklist">
+    <li>&#9744; <code>.firebaserc</code> points at the user's project ID, and <code>firebase.json</code> still matches A2.</li>
+    <li>&#9744; Both workflows use pnpm, run typecheck/check/test/build <em>before</em> deploying, reference the secret only by name, and skip forks on PRs.</li>
+    <li>&#9744; A PR gets a bot comment with a working preview URL (expires in 7 days).</li>
+    <li>&#9744; After merge, <code>https://&lt;projectId&gt;.web.app</code> serves the app, and <code>hosting.spec.ts</code> passes against it.</li>
+    <li>&#9744; The README and ARCHITECTURE show the live URL. The U9 answer (real data on github.io: yes/no) is recorded, and GitHub Pages is unpublished if the answer is no.</li>
+  </ul>
+
+  <h2>F2 &mdash; Auth + Firestore + migration + rules (scope only; full plan after slice 1 and F1 ship)</h2>
+  <table>
+    <tr><th>Part</th><th>Sketch</th><th>Gate</th></tr>
+    <tr><td>Config</td><td>Commit <code>src/lib/firebase-config.ts</code> with the 6 public fields from U2. <code>src/lib/firebase.ts</code> calls <code>initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })</code>. When <code>NEXT_PUBLIC_FIREBASE_EMULATORS=1</code>, it connects the Auth/Firestore emulators with project <code>demo-sdt</code>.</td><td class="wait">WAIT U2 (emulator path NOW)</td></tr>
+    <tr><td>Data</td><td><code>users/{uid}</code> (profile, <code>migratedFromDexieAt</code>, later <code>aiConsentAt</code>), <code>users/{uid}/categories/{id}</code>, <code>users/{uid}/activities/{id}</code>. Same ids and fields as today, including <code>spanId</code>. Span edit/delete use a <code>writeBatch</code> in place of the Dexie <code>rw</code> transaction. Hooks keep their names and signatures and switch to <code>onSnapshot</code>. Pure helpers are unchanged.</td><td class="now">NOW (pure mappers)</td></tr>
+    <tr><td>Auth</td><td>Google via <code>signInWithPopup</code>. Set <code>authDomain</code> to the Hosting domain (web.app / custom), which avoids redirect breakage from third-party storage partitioning. Sign-in screen + sign-out in the sidebar.</td><td class="wait">WAIT U2, U3</td></tr>
+    <tr><td>Migration</td><td>Follows the ADR-007 sign-in/migration activity diagram. Pure <code>planDexieMigration(dexieRows, existingIds)</code> returns batches of &le;500 ops (one <code>writeBatch</code> caps at 500 writes, so a large Dexie needs several). It skips <code>demo-*</code> rows, writes idempotently (same ids, <code>set</code>), and sets the marker last. Dexie is kept read-only for one release, then deleted.</td><td class="now">NOW (pure + emulator)</td></tr>
+    <tr><td>Rules</td><td><code>firestore.rules</code>: <code>users/{uid}/**</code> is readable/writable only when <code>request.auth.uid == uid</code>, plus field and type validation on activities (minutes ranges, <code>IsoDate</code> regex). Tested with <code>@firebase/rules-unit-testing</code> on the emulator. Deployed by the workflow (<code>firebase deploy --only firestore:rules</code>).</td><td class="now">NOW (emulator; needs JDK 21)</td></tr>
+    <tr><td>Verify</td><td>Tester runs <code>firebase emulators:exec --only auth,firestore --project demo-sdt</code> around the rules tests and E2E, where the emulator's fake Google account signs in. No real credentials are needed.</td><td>&mdash;</td></tr>
+    <tr><td>Open questions</td><td colspan="2">(a) <em>Resolved by the ADR-007 activity diagram:</em> sign-in is required, and offline first-run users see &ldquo;Connect to sign in&rdquo; (no guest mode). This rewrites every existing E2E spec to sign in through the Auth emulator first. (b) Data is stored in Singapore (<code>asia-southeast1</code>) and the users are minors: a privacy notice/consent text is needed under VN personal-data rules (Decree 13/2023). Who writes it? (c) The U9 answer: is a github.io data export needed? (d) Do PR previews need working sign-in? Preview channel domains may need to be added to Authorized domains by hand.</td></tr>
+  </table>
+
+  <h2>F3 &mdash; AI comments (scope only; after roadmap slice 4)</h2>
+  <table>
+    <tr><th>Part</th><th>Sketch</th><th>Gate</th></tr>
+    <tr><td>Prompt</td><td>Pure <code>buildAiCommentPrompt(aggregates)</code> takes only numbers: minutes per <em>default</em> category key, counts, goal deltas. No names, emails, or free-text activity/category names. Unit-tested to reject any string field.</td><td class="now">NOW</td></tr>
+    <tr><td>Client</td><td><code>firebase/ai</code> (<code>getAI</code> + <code>GoogleAIBackend</code>) behind an injectable <code>AiCommentClient</code> interface. App Check uses the reCAPTCHA v3 provider (site key from U6), with a debug token only in local dev. Enforcement on AI Logic is switched on by the user after metrics show valid tokens.</td><td class="wait">WAIT U5, U6</td></tr>
+    <tr><td>Limits</td><td>Cache in <code>users/{uid}/aiComments/{IsoDate}</code>, so there is at most 1 call per user per day. Fall back to slice 4's rule-based comments when offline, on quota or HTTP 429, or without consent. Optional per-user rate limit in the AI Logic console.</td><td class="now">NOW (mocked)</td></tr>
+    <tr><td>Consent</td><td>Consent screen before the first AI call (users are minors), stored as <code>aiConsentAt</code>. Copy states that Google may use free-tier inputs.</td><td class="now">NOW</td></tr>
+    <tr><td>Verify</td><td>Unit and E2E tests use a fake <code>AiCommentClient</code>. A manual real-call smoke test runs only on the user's machine with their own debug token.</td><td>&mdash;</td></tr>
+  </table>
+</body>
+</html>

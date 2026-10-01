@@ -24,7 +24,7 @@
 </head>
 <body>
   <h1>Plan: v2 roadmap + Slice 1 &mdash; Activities that cross midnight</h1>
-  <p class="meta">2026-10-01 &middot; source: requirement/Requirement.txt (new, alongside requirement/Requirement.docx) &middot; summary: docs/REQUIREMENTS.md &sect;4 &middot; supersedes D5 of plans/2026-09-26-add-activity.html &middot; related: docs/DECISIONS.md ADR-001 &middot; <strong>Slice 1: implementer runs this next</strong> &middot; Slices 2&ndash;8: plan later, one at a time</p>
+  <p class="meta">2026-10-01 &middot; source: requirement/Requirement.txt (new, alongside requirement/Requirement.docx) &middot; summary: docs/REQUIREMENTS.md &sect;4 &middot; supersedes D5 of plans/2026-09-26-add-activity.html &middot; related: docs/DECISIONS.md ADR-001 (superseded) &middot; <strong>D-A resolved by architecture/ADR-007-firebase.md (Firebase)</strong>; Firebase sub-slices F1&ndash;F3: plans/2026-10-01-firebase-setup.html &middot; <strong>Slice 1: implementer runs this next</strong> &middot; Slices 2&ndash;8: plan later, one at a time</p>
 
   <h2>Scope</h2>
   <p><strong>This file does two things.</strong> (1) It breaks Requirement.txt into eight ordered slices and surfaces two
@@ -37,16 +37,23 @@
   <blockquote>Người dùng ở đây là học sinh và đang tham gia quá trình thi Đại học. Hãy hỗ trợ để phát triển 1 app có thể hỗ trợ gợi ý cho học sinh và phụ huynh</blockquote>
 
   <h2>Roadmap (recommended order)</h2>
+  <div class="decision">
+  <p><strong>Update 2026-10-01: D-A resolved.</strong> The user chose Firebase (architecture/ADR-007-firebase.md). The Firebase work is split into
+  F1 Hosting + CI, F2 Auth + Firestore + Dexie migration + rules (this <em>absorbs slice 7</em>), and F3 AI comments
+  (plans/2026-10-01-firebase-setup.html). <strong>New order:</strong> <span class="rec">1 &parallel; F1 &rarr; F2 &rarr; 2 &rarr; 3 &rarr; 4 &rarr; F3 &rarr; 5 &rarr; 6</span>; slice 8 is out of scope (ADR-007).
+  Slice 1 stays first, so data migrates to Firestore once and already in its final shape (<code>spanId</code>). Slices 2&ndash;4 come after F2, so their
+  stores are built directly in Firestore under <code>users/{uid}</code>, not in Dexie first. F3 comes after 4, because slice 4's rule-based comments are F3's fallback.</p>
+  </div>
   <table>
     <tr><th>#</th><th>Slice</th><th>Requirement.txt item</th><th>Depends on</th><th>Blocked by decision?</th></tr>
     <tr><td>1</td><td><strong>Cross-midnight activities</strong> (bug fix, planned in full below)</td><td>&ldquo;Fix bug: Khi nhập activity từ 21:00 của ngày hôm trước đến 1:00 hôm sau không được&rdquo;</td><td>&mdash;</td><td>No</td></tr>
-    <tr><td>2</td><td>Onboarding habit questionnaire (~5 questions, first run only, can be edited later in Settings)</td><td>&ldquo;Ở lần đầu tiên, đưa ra các gợi ý đề habit &hellip; đặt khoảng 5 câu hỏi.&rdquo;</td><td>1 (the sleep window crosses midnight)</td><td><strong>D-B</strong> (how goals map to categories). D-A is only a soft dependency: store the profile under <code>profileId = 'local'</code> so options A and C need no rework</td></tr>
+    <tr><td>2</td><td>Onboarding habit questionnaire (~5 questions, first run only, can be edited later in Settings)</td><td>&ldquo;Ở lần đầu tiên, đưa ra các gợi ý đề habit &hellip; đặt khoảng 5 câu hỏi.&rdquo;</td><td>1 (the sleep window crosses midnight)</td><td><strong>D-B</strong> (how goals map to categories). Built after F2, so the profile lives at <code>users/{uid}</code> (no <code>profileId = 'local'</code>)</td></tr>
     <tr><td>3</td><td>Daily satisfaction rating (1&ndash;5 + optional note per day, Home and History)</td><td>&ldquo;Đánh giá mức độ hài lòng trong ngày&rdquo;</td><td>&mdash; (separate from the rest; small)</td><td>No</td></tr>
     <tr><td>4</td><td>Goal-violation warnings + comments (daily: sleep below target, bedtime later than target, entertainment over its cap, &hellip;)</td><td>&ldquo;&hellip; đưa ra cảnh báo nếu activity của User đang vi phạm. Đưa ra nhận xét cho người dùng.&rdquo;</td><td>1, 2 (needs goals); 3 optional (comments can mention the rating)</td><td>D-B</td></tr>
     <tr><td>5</td><td>% efficiency vs. baseline (&ldquo;chuẩn đầu vào&rdquo; = onboarding goals), shown when the app opens + on Insights</td><td>&ldquo;Khi học sinh đăng nhập sẽ dựa vào chuẩn đầu vào tính % hiệu quả đưa ra nhận xét&rdquo;</td><td>2, 4 (uses the same goal-vs-actual helpers)</td><td>D-B; the formula needs the user's OK (open question)</td></tr>
-    <tr><td>6</td><td>Stickers, Facebook style (built-in pack + user-added stickers, attached to an activity and/or a day)</td><td>&ldquo;Cho quyền add thêm các sticker nhãn dán, hãy tham khảo facebook&hellip;&rdquo;</td><td>&mdash; (3 if stickers attach to the daily rating)</td><td>No (D-A only if stickers should sync)</td></tr>
-    <tr><td>7</td><td>User + login</td><td>&ldquo;Tạo User và đăng nhập.&rdquo;</td><td>2 (the profile already exists by then)</td><td><strong>D-A</strong></td></tr>
-    <tr><td>8</td><td>Parent-facing view</td><td>&ldquo;&hellip; gợi ý cho học sinh và phụ huynh&rdquo;</td><td>4, 5 (parents mostly want warnings + efficiency); 7</td><td><strong>D-A</strong></td></tr>
+    <tr><td>6</td><td>Stickers, Facebook style (built-in pack + user-added stickers, attached to an activity and/or a day)</td><td>&ldquo;Cho quyền add thêm các sticker nhãn dán, hãy tham khảo facebook&hellip;&rdquo;</td><td>&mdash; (3 if stickers attach to the daily rating)</td><td>No. Built-in pack only: user-uploaded stickers need Cloud Storage, which needs Blaze (out of scope in ADR-007)</td></tr>
+    <tr><td>7</td><td>User + login</td><td>&ldquo;Tạo User và đăng nhập.&rdquo;</td><td>&mdash;</td><td>Resolved (ADR-007). <strong>Delivered by F2</strong> (Google sign-in), no separate slice</td></tr>
+    <tr><td>8</td><td>Parent-facing view</td><td>&ldquo;&hellip; gợi ý cho học sinh và phụ huynh&rdquo;</td><td>4, 5; F2</td><td>Out of scope in ADR-007 (needs its own decision: parent account linking + sharing rules)</td></tr>
   </table>
   <p><strong>Why this order:</strong> start with the bug fix because sleep logging depends on it. Warnings and % need
   goals, so onboarding comes first. The rating is cheap, needs nothing else, and gives comments a &ldquo;how did the day
@@ -57,6 +64,7 @@
 
   <div class="decision">
   <h3>D-A &middot; &ldquo;Tạo User và đăng nhập&rdquo; vs. ADR-001 (offline-first, no backend, no auth). Blocks slices 7, 8</h3>
+  <p><strong>RESOLVED 2026-10-01 &rarr; option B with Firebase</strong> (architecture/ADR-007-firebase.md), on the Spark plan. Options below are kept for the record.</p>
   <table>
     <tr><th>Option</th><th>What it is</th><th>Parents</th><th>Cost / risk</th></tr>
     <tr><td><strong>A &middot; Local profiles</strong></td><td>One or more profiles on the device (name, optional 4-digit PIN), with a profile switcher. Data is partitioned by <code>profileId</code>. Still no server. ADR-001 stays and gets an ADR-007 addendum.</td><td>Parents look on the student's device (read-only &ldquo;Parent view&rdquo; tab), or the student sends a <strong>weekly report</strong> (Web Share / download as image or text). No remote monitoring.</td><td>Low&ndash;Med. The PIN only keeps a sibling out; it is <em>not</em> security, because IndexedDB can be read in devtools. Data is still lost if site data is cleared (export/import backup becomes more important).</td></tr>
@@ -182,9 +190,9 @@
     <tr><td>3 Satisfaction</td><td>Per-day 1&ndash;5 rating + optional note in a new <code>dayRatings</code> store (key = <code>IsoDate</code>). Shown on Home, History, and an Insights trend.</td><td>Scale: 5 stars or 5 emoji? Can past days be rated?</td></tr>
     <tr><td>4 Warnings + comments</td><td>Pure <code>evaluateGoals(activities, goals, date)</code> returns violations (e.g. sleep 5h30m &lt; 7h target). Shown as a calm inline banner on Home and as comments on Insights. Uses the same &ldquo;no good/bad&rdquo; tone as docx &sect;3.2.</td><td>When to warn: live during the day, or only once the day is over? Should we notify (would need the Notification permission)?</td></tr>
     <tr><td>5 % efficiency</td><td>Pure <code>getEfficiency(actual, goals)</code> returns the % of goals met (per goal + overall), shown when the app opens and on Insights.</td><td>Formula needs the user's OK: average of per-goal min(actual/target, 1), or a weighted average? Is the period a day or a week?</td></tr>
-    <tr><td>6 Stickers</td><td>Facebook-style: a built-in offline pack bundled in <code>public/</code> + user-added stickers (image upload stored as a Blob in Dexie, size-capped), attached to an activity or a day.</td><td>Attach to activity, day, or both? Licence for the built-in pack? Size limit for uploads?</td></tr>
-    <tr><td>7 User + login</td><td>Depends on D-A. Option A: profile picker + optional PIN, data partitioned by <code>profileId</code> (additive migration of existing rows to <code>'local'</code>).</td><td>D-A</td></tr>
-    <tr><td>8 Parent view</td><td>Option A: read-only parent tab + exportable weekly report (warnings, %, rating trend). Option B: remote parent account.</td><td>D-A. What does a parent see: everything, or only summaries? Does the student have to consent?</td></tr>
+    <tr><td>6 Stickers</td><td>Facebook-style: a built-in offline pack bundled in <code>public/</code> , attached to an activity or a day. User uploads are deferred: Cloud Storage needs Blaze (ADR-007).</td><td>Attach to activity, day, or both? Licence for the built-in pack? Is an upload decision needed later (Blaze or inline small images)?</td></tr>
+    <tr><td>7 User + login</td><td>Delivered by F2 in plans/2026-10-01-firebase-setup.html: Google sign-in, Firestore under <code>users/{uid}</code>, one-time Dexie migration.</td><td>See F2 open questions there</td></tr>
+    <tr><td>8 Parent view</td><td>Out of scope in ADR-007. A future option is a parent Google account granted read access by Security Rules, or the exportable weekly report.</td><td>D-A. What does a parent see: everything, or only summaries? Does the student have to consent?</td></tr>
   </table>
 </body>
 </html>

@@ -119,8 +119,10 @@ Khi học sinh đăng nhập sẽ dựa vào chuẩn đầu vào tính % hiệu 
 Notes:
 - The cross-midnight bug fix **overrides** decision D5 ("activities can't cross midnight") from
   `plans/2026-09-26-add-activity.html`.
-- "Tạo User và đăng nhập" conflicts with ADR-001 (no backend, no auth). It is an open user
-  decision (D-A in the v2 roadmap plan) and is not decided yet.
+- "Tạo User và đăng nhập" conflicted with ADR-001 (no backend, no auth). D-A was resolved on
+  2026-10-01: Firebase ([`architecture/ADR-007-firebase.md`](../architecture/ADR-007-firebase.md)),
+  delivered as sub-slices F1–F3 in
+  [`plans/2026-10-01-firebase-setup.html`](../plans/2026-10-01-firebase-setup.html).
 
 ## Status
 
@@ -131,4 +133,4 @@ time slot only.
 
 Section 4 is being delivered one slice at a time through the Plan → Implement → Test workflow
 (see `CLAUDE.md`). As of 2026-10-01 none of it is built: slice 1 (cross-midnight) is planned and
-unblocked; decisions D-A (login) and D-B (goal ↔ category mapping) are still open.
+unblocked; D-A (login) is resolved by ADR-007 (Firebase, F1–F3); D-B (goal ↔ category mapping) is still open.

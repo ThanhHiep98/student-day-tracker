@@ -14,9 +14,13 @@ Dexie on the device.
   structured summary at [`docs/REQUIREMENTS.md`](./docs/REQUIREMENTS.md).
 - Technical design: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md),
   [`docs/DECISIONS.md`](./docs/DECISIONS.md) (ADRs).
-- **Current status**: environment scaffold. Routing, data schema, and the read path work and are
-  tested. Write flows and Insights' charts are placeholders — see `docs/ARCHITECTURE.md` →
-  "Status" for exactly what's built vs. pending.
+- **Current status**: v1 (requirement sections 1–3) shipped 2026-10-01 — Home's add/edit/delete
+  and custom categories persist in Dexie, History reads the same data, Insights is computed from
+  real data. v2 (`requirement/Requirement.txt`, `docs/REQUIREMENTS.md` §4) is in progress per
+  `plans/2026-10-01-v2-roadmap-cross-midnight.html`: slice 1 (cross-midnight) is planned, not
+  built; D-A is resolved by `architecture/ADR-007-firebase.md` (Firebase), planned in
+  `plans/2026-10-01-firebase-setup.html` (F1 Hosting + CI first); D-B (goal ↔ category) is open. Details in
+  `docs/ARCHITECTURE.md` → "Status".
 
 ## Tech stack
 
@@ -31,7 +35,8 @@ src/app/            Next.js routes: /  /history  /insights, layout, manifest, se
 src/components/     Flat, co-located tests, no barrels
 src/lib/            Dexie client, pure helpers (+ tests), use-* hooks
 tests/e2e/          Playwright: route smoke tests, a11y
-docs/               REQUIREMENTS.md, ARCHITECTURE.md, DECISIONS.md
+docs/               REQUIREMENTS.md, ARCHITECTURE.md, DECISIONS.md (ADR-001…006)
+architecture/       One .md per ADR from ADR-007 on (context/decision/consequences + Mermaid UD/AD)
 requirement/        Original Requirement.docx (source of truth — don't edit; re-export instead)
 plans/              HTML implementation plans produced by the planner agent
 .claude/agents/      planner.md, implementer.md, tester.md
@@ -84,7 +89,22 @@ planning. Keep entries terse; don't restate what's already here.)*
   distinct `spanId ?? id`. See `plans/2026-10-01-v2-roadmap-cross-midnight.html`.
 - **Per-user data from v2 on (goals, ratings, stickers) is keyed by `profileId`**, which is
   `'local'` until the auth decision (D-A) lands, so that local profiles can be added later
-  without rewriting stores.
+  without rewriting stores. *(Obsolete once F2 ships: D-A is resolved by
+  `architecture/ADR-007-firebase.md`; per-user data then lives under the `users/{uid}/…` path, with no
+  `profileId` field. The Dexie rules above (additive `.version()`, `fake-indexeddb` integration
+  test) also retire with F2; see `plans/2026-10-01-firebase-setup.html`.)*
+- **Firestore era (F2+):** Firestore access lives only in `src/lib/firebase.ts` + `use-*` hooks;
+  docs keep today's ids/fields; multi-row writes (spans, migration) use `writeBatch` (≤500 ops).
+  Security Rules changes ship with a `@firebase/rules-unit-testing` test on the emulator.
+- **No real Firebase credentials in tests:** emulators run with a `demo-*` project id
+  (`demo-sdt`), the AI client is injected and mocked; only deploy jobs use the
+  `FIREBASE_SERVICE_ACCOUNT_*` secret. The web `firebaseConfig` is public and committed; never
+  commit or ask for service-account JSON, reCAPTCHA secrets, App Check debug tokens, or API keys.
+- **Firebase Hosting is the only deploy target**, served from the domain root (no `basePath`);
+  live on merge to `master`, preview channel per PR, checks run before deploy.
+- **AI input is built by a pure `build*Prompt` helper from aggregated numbers only** (no names,
+  emails, or free-text activity/category names), unit-tested for that; ≤1 call/user/day cached,
+  rule-based fallback when offline, over quota, or without consent.
 
 ## Development workflow: Plan → Implement → Test
 
