@@ -23,3 +23,36 @@ test('Home has no accessibility violations with the Add Activity dialog open', a
   const { violations } = await new AxeBuilder({ page }).analyze();
   expect(violations).toEqual([]);
 });
+
+test('Home has no accessibility violations with an inline validation error showing', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '+ Add Activity' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Save activity' }).click();
+  await expect(dialog.getByText('Name is required.')).toBeVisible();
+
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect(violations).toEqual([]);
+});
+
+test('/insights has no accessibility violations with demo data', async ({ page }) => {
+  await page.goto('/insights');
+  await expect(page.getByText('Demo data')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Weekly overview' })).toBeVisible();
+
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect(violations).toEqual([]);
+});
+
+test('/insights has no accessibility violations in its empty state', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('sdt-demo-dismissed', '1');
+  });
+  await page.goto('/insights');
+  await expect(page.getByRole('heading', { name: 'Nothing tracked this week yet' })).toBeVisible();
+
+  const { violations } = await new AxeBuilder({ page }).analyze();
+  expect(violations).toEqual([]);
+});

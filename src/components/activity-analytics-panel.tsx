@@ -1,29 +1,26 @@
 'use client';
 
+import { EmptyState } from '@/components/empty-state';
+import type { ActivityAnalytics } from '@/lib/get-activity-analytics';
 import { formatMinutes } from '@/lib/get-daily-summary';
-
-interface ActivityAnalytics {
-  name: string;
-  totalMinutes: number;
-  sessions: number;
-  averageSessionMinutes: number;
-  longestSessionMinutes: number;
-  mostCommonTime: string;
-}
 
 interface ActivityAnalyticsPanelProps {
   activities: ActivityAnalytics[];
-  selectedName: string;
-  onSelect: (name: string) => void;
+  /** Grouping key of the selected activity; falls back to the first row. */
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
 }
 
-/** Req. 3.4 "Activity Analytics" — drill-down for one activity at a time. */
+/**
+ * Req. 3.4 "Activity Analytics" — this month's activities grouped by name
+ * (getActivityAnalytics), with a drill-down for one activity at a time.
+ */
 export function ActivityAnalyticsPanel({
   activities,
-  selectedName,
+  selectedKey,
   onSelect,
 }: ActivityAnalyticsPanelProps) {
-  const selected = activities.find((a) => a.name === selectedName) ?? activities[0];
+  const selected = activities.find((a) => a.key === selectedKey) ?? activities[0];
 
   const rows: [string, string][] = selected
     ? [
@@ -43,15 +40,24 @@ export function ActivityAnalyticsPanel({
       <h2 id="activity-analytics-heading" className="text-sm font-semibold">
         Activity analytics
       </h2>
+      {activities.length === 0 && (
+        <div className="mt-4">
+          <EmptyState
+            headingLevel="h3"
+            title="No activities this month yet"
+            description="Each activity you track this month gets its own breakdown here."
+          />
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap gap-1.5">
         {activities.map((a) => (
           <button
-            key={a.name}
+            key={a.key}
             type="button"
-            onClick={() => onSelect(a.name)}
-            aria-pressed={a.name === selected?.name}
+            onClick={() => onSelect(a.key)}
+            aria-pressed={a.key === selected?.key}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors motion-reduce:transition-none ${
-              a.name === selected?.name
+              a.key === selected?.key
                 ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                 : 'bg-surface-muted text-zinc-600 hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-700'
             }`}

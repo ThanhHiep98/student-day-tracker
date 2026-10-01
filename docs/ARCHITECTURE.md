@@ -138,9 +138,18 @@ adding them is the Implement/Test agents' job, guided by the plan the Plan agent
 
 ## Status
 
-**Environment scaffold complete, feature build not started.** Tooling (Next.js, TypeScript,
-Tailwind, Dexie, Serwist PWA, Vitest, Playwright + axe, Biome), the data schema, routing for the
-three sections, and the read path (today's/selected-day activities, month calendar, empty states)
-are in place and tested. Write flows (add/edit/delete activity, custom categories) and Insights'
-charts/comparisons/cards are placeholders — see `docs/REQUIREMENTS.md` → "Out of scope for the
-environment scaffold" and the agent workflow in `CLAUDE.md`.
+**v1 feature build: Frontend + Backend slices implemented** (`plans/2026-09-26-add-activity.html`).
+
+- **Built:** Home's Add / Edit / Delete Activity and "+ New category" write to Dexie through the
+  pure builders `buildActivity` / `buildUpdatedActivity` / `buildCategory`
+  (`src/lib/build-activity.ts`, `src/lib/build-category.ts`), which own validation and throw
+  user-facing messages the form shows inline. History reads the same rows (read-only). Insights'
+  five sections are computed from one live Dexie range query (`useActivitiesRange`) by pure
+  helpers: `getWeeklySummary`, `getWeekToDateComparison` / `comparePeriods`,
+  `buildInsightCards`, `getMonthlySummary`, `getActivityAnalytics`. Weeks are Mon–Sun, months
+  are calendar months; Compare is week-to-date vs. the same weekdays last week.
+- **Demo data:** seeded rows use a `demo-` id prefix; "Clear & start fresh" (Home and Insights)
+  deletes only `demo-*` rows plus any legacy ids from the old `sdt-demo-activity-ids` key.
+- **Deferred:** renaming/deleting custom categories, editing from History, overlap detection,
+  activities that cross midnight, changing an activity's date. No Dexie schema version bump was
+  needed.

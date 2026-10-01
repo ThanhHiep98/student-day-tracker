@@ -1,5 +1,12 @@
-import { addDays, toIsoDate } from './iso-date';
-import type { Activity } from './types';
+import { addDays } from './iso-date';
+import type { Activity, IsoDate } from './types';
+
+/** Demo rows are identified by this id prefix (plan §2.2 D7) — no schema field. */
+export const DEMO_ID_PREFIX = 'demo-';
+
+export function isDemoActivity(activity: Pick<Activity, 'id'>): boolean {
+  return activity.id.startsWith(DEMO_ID_PREFIX);
+}
 
 type DemoEntry = [name: string, categoryId: string, startMinutes: number, endMinutes: number];
 
@@ -9,8 +16,11 @@ const t = (hh: number, mm = 0) => hh * 60 + mm;
  * Demo activities spanning today + the past 6 days — enough for History's
  * calendar to have several populated days to click into, not just today.
  * Written straight into Dexie (see use-demo-data.ts), so Home, History, and
- * (once Backend wires real aggregation) Insights all read the SAME data
+ * Insights all read the SAME data
  * instead of each page inventing its own numbers.
+ *
+ * Every id is `demo-${uuid}` so "Clear & start fresh" can delete exactly the
+ * demo rows and nothing the user added.
  */
 const DAYS_AGO_TO_ENTRIES: Record<number, DemoEntry[]> = {
   0: [
@@ -54,17 +64,23 @@ const DAYS_AGO_TO_ENTRIES: Record<number, DemoEntry[]> = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function buildDemoActivities(): Activity[] {
-  const todayIso = toIsoDate(new Date());
-  const now = Date.now();
+/**
+ * Pure — `today`, `now` and the id generator are passed in, so the caller
+ * owns the clock and tests are deterministic.
+ */
+export function buildDemoActivities(
+  today: IsoDate,
+  now: number,
+  makeId: () => string = () => crypto.randomUUID()
+): Activity[] {
   const activities: Activity[] = [];
 
   for (const [daysAgoStr, entries] of Object.entries(DAYS_AGO_TO_ENTRIES)) {
     const daysAgo = Number(daysAgoStr);
-    const date = addDays(todayIso, -daysAgo);
+    const date = addDays(today, -daysAgo);
     entries.forEach(([name, categoryId, startMinutes, endMinutes], i) => {
       activities.push({
-        id: crypto.randomUUID(),
+        id: `${DEMO_ID_PREFIX}${makeId()}`,
         name,
         categoryId,
         date,

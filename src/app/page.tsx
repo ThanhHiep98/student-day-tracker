@@ -11,6 +11,9 @@ import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { RecentActivityRail } from '@/components/recent-activity-rail';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TipCard } from '@/components/tip-card';
+import { buildActivity, buildUpdatedActivity } from '@/lib/build-activity';
+import { buildCategory } from '@/lib/build-category';
+import { db } from '@/lib/db';
 import { getDailySummary } from '@/lib/get-daily-summary';
 import { toIsoDate } from '@/lib/iso-date';
 import type { Activity, Category } from '@/lib/types';
@@ -26,36 +29,24 @@ const GREETING_BY_HOUR = (hour: number) => {
   return 'Good evening';
 };
 
-const SESSION_CATEGORY_COLORS = ['#0ea5e9', '#8b5cf6', '#14b8a6', '#f97316'];
-
 type FormState =
   | { open: false }
   | { open: true; mode: 'add' }
   | { open: true; mode: 'edit'; activity: Activity };
 
 /**
- * Home — req. 1. Add/Edit/Delete Activity and "+ New category" are wired
- * here as SESSION-LOCAL state layered over the real Dexie read — this is
- * the Frontend phase from plans/2026-09-26-add-activity.html §1.1: no Dexie
- * write from a *user action* (db.activities, db.categories) ever runs on
- * this page. Backend phase (plan §2) replaces this overlay with real Dexie
- * writes behind the same UI. See CLAUDE.md.
- *
- * Demo content is the one exception — useDemoData seeds it straight into
- * Dexie (see that file for why) so it's identical across Home, History, and
- * every other page, not a Home-only overlay.
+ * Home — req. 1. Add/Edit/Delete Activity and "+ New category" build rows
+ * with the pure builders (build-activity.ts / build-category.ts, which own
+ * validation and throw user-facing messages) and write them to Dexie; the
+ * live queries re-render the Timeline and Daily summary. A builder or Dexie
+ * error propagates to AddActivityForm, which shows it inline.
  */
 export default function Home() {
   const today = toIsoDate(new Date());
-  const dbActivities = useActivities(today);
-  const dbCategories = useCategories();
+  const activities = useActivities(today);
+  const categories = useCategories();
   const { canInstall, install, dismiss } = useInstallPrompt();
   const { isDemo, clearDemo } = useDemoData();
-
-  const [sessionCategories, setSessionCategories] = useState<Category[]>([]);
-  const [sessionActivities, setSessionActivities] = useState<Activity[]>([]);
-  const [editedActivities, setEditedActivities] = useState<Record<string, Activity>>({});
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
@@ -67,51 +58,35 @@ export default function Home() {
     day: 'numeric',
   });
 
-  const categories = dbCategories ? [...dbCategories, ...sessionCategories] : undefined;
-  const activities =
-    dbActivities === undefined
-      ? undefined
-      : [...dbActivities, ...sessionActivities]
-          .filter((a) => !deletedIds.has(a.id))
-          .map((a) => editedActivities[a.id] ?? a)
-          .sort((a, b) => a.startMinutes - b.startMinutes);
-
   const summary = activities && categories ? getDailySummary(activities, categories) : undefined;
 
-  function handleCreateCategory(name: string): Category | null {
-    const color =
-      SESSION_CATEGORY_COLORS[sessionCategories.length % SESSION_CATEGORY_COLORS.length];
-    const category: Category = {
+  async function handleCreateCategory(name: string): Promise<Category> {
+    const category = buildCategory(name, categories ?? [], {
       id: crypto.randomUUID(),
-      name,
-      color,
-      icon: '🏷️',
-      isDefault: false,
       createdAt: Date.now(),
-    };
-    setSessionCategories((prev) => [...prev, category]);
+    });
+    await db.categories.add(category);
     return category;
   }
 
-  function handleSubmit(values: AddActivityFormValues) {
+  async function handleSubmit(values: AddActivityFormValues) {
     if (formState.open && formState.mode === 'edit') {
-      const updated: Activity = { ...formState.activity, ...values };
-      setEditedActivities((prev) => ({ ...prev, [updated.id]: updated }));
+      await db.activities.put(buildUpdatedActivity(formState.activity, values, categories ?? []));
     } else {
-      const activity: Activity = {
-        id: crypto.randomUUID(),
-        date: today,
-        createdAt: Date.now(),
-        ...values,
-      };
-      setSessionActivities((prev) => [...prev, activity]);
+      await db.activities.add(
+        buildActivity(values, categories ?? [], {
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+          date: today,
+        })
+      );
     }
     setFormState({ open: false });
   }
 
-  function handleDeleteConfirmed() {
+  async function handleDeleteConfirmed() {
     if (confirmDelete) {
-      setDeletedIds((prev) => new Set(prev).add(confirmDelete.id));
+      await db.activities.delete(confirmDelete.id);
       setConfirmDelete(null);
     }
   }

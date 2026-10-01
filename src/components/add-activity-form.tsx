@@ -1,25 +1,22 @@
 'use client';
 
+import type { ActivityInput } from '@/lib/build-activity';
 import { formatMinutes } from '@/lib/get-daily-summary';
 import type { Category } from '@/lib/types';
 import { useEffect, useId, useRef, useState } from 'react';
 
-export interface AddActivityFormValues {
-  name: string;
-  categoryId: string;
-  startMinutes: number;
-  endMinutes: number;
-}
+export type AddActivityFormValues = ActivityInput;
 
 interface AddActivityFormProps {
   open: boolean;
   mode: 'add' | 'edit';
   categories: Category[];
   initialValues?: AddActivityFormValues;
-  onSubmit: (values: AddActivityFormValues) => void;
+  /** Persists the values; reject with a user-facing Error to keep the form open. */
+  onSubmit: (values: AddActivityFormValues) => Promise<void>;
   onCancel: () => void;
-  /** Returns the created Category, or null if it couldn't be created. */
-  onCreateCategory: (name: string) => Category | null;
+  /** Persists and resolves the new Category; reject with a user-facing Error. */
+  onCreateCategory: (name: string) => Promise<Category>;
 }
 
 function minutesToClock(minutes: number): string {
@@ -37,11 +34,15 @@ function clockToMinutes(value: string): number | null {
 const DEFAULT_START = 9 * 60;
 const DEFAULT_END = 10 * 60;
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+}
+
 /**
  * Req. 1.3 "Add activity" (also handles Edit, req. 1.2, via `mode`). Submits
- * plain values — the caller decides how to persist them. Frontend phase
- * (plans/2026-09-26-add-activity.html §1.1): the caller only updates
- * session-local state, no Dexie write happens here or in the caller yet.
+ * plain values — the caller builds + persists them via buildActivity /
+ * buildUpdatedActivity, which own all validation. Any thrown message is shown
+ * inline and the dialog stays open; this form only parses HH:MM.
  *
  * <dialog> pattern mirrors confirm-dialog.tsx: focus trap via showModal(),
  * Escape closes natively, backdrop click cancels.
@@ -67,6 +68,8 @@ export function AddActivityForm({
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [categoryPending, setCategoryPending] = useState(false);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -92,6 +95,8 @@ export function AddActivityForm({
     setShowNewCategory(false);
     setNewCategoryName('');
     setCategoryError(null);
+    setPending(false);
+    setCategoryPending(false);
   }, [open, initialValues]);
 
   // Default to the first category once one is available, if none is set.
@@ -113,50 +118,39 @@ export function AddActivityForm({
     if (e.target === ref.current) onCancel();
   }
 
-  function handleAddCategory() {
-    const trimmed = newCategoryName.trim();
-    if (!trimmed) {
-      setCategoryError('Category name is required.');
-      return;
+  async function handleAddCategory() {
+    setCategoryPending(true);
+    try {
+      const created = await onCreateCategory(newCategoryName);
+      setCategoryId(created.id);
+      setNewCategoryName('');
+      setShowNewCategory(false);
+      setCategoryError(null);
+    } catch (err) {
+      setCategoryError(errorMessage(err));
+    } finally {
+      setCategoryPending(false);
     }
-    if (categories.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) {
-      setCategoryError('That category already exists.');
-      return;
-    }
-    const created = onCreateCategory(trimmed);
-    if (!created) {
-      setCategoryError('Could not create category.');
-      return;
-    }
-    setCategoryId(created.id);
-    setNewCategoryName('');
-    setShowNewCategory(false);
-    setCategoryError(null);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      setError('Name is required.');
-      return;
+    setPending(true);
+    try {
+      await onSubmit({
+        name,
+        categoryId,
+        // Unparseable input becomes NaN, which the builder rejects with
+        // "Enter a valid start and end time."
+        startMinutes: clockToMinutes(startTime) ?? Number.NaN,
+        endMinutes: clockToMinutes(endTime) ?? Number.NaN,
+      });
+      setError(null);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPending(false);
     }
-    if (!categoryId) {
-      setError('Choose a category.');
-      return;
-    }
-    const startMinutes = clockToMinutes(startTime);
-    const endMinutes = clockToMinutes(endTime);
-    if (startMinutes === null || endMinutes === null) {
-      setError('Enter a valid start and end time.');
-      return;
-    }
-    if (endMinutes <= startMinutes) {
-      setError('End time must be after start time.');
-      return;
-    }
-    setError(null);
-    onSubmit({ name: trimmedName, categoryId, startMinutes, endMinutes });
   }
 
   const startMinutes = clockToMinutes(startTime);
@@ -239,14 +233,17 @@ export function AddActivityForm({
               <button
                 type="button"
                 onClick={handleAddCategory}
-                className="shrink-0 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                disabled={categoryPending}
+                className="shrink-0 rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
               >
                 Add
               </button>
             </div>
           )}
           {categoryError && (
-            <p className="mt-1 text-xs text-rose-600 dark:text-rose-400">{categoryError}</p>
+            <p role="alert" className="mt-1 text-xs text-rose-600 dark:text-rose-400">
+              {categoryError}
+            </p>
           )}
         </div>
 
@@ -288,7 +285,11 @@ export function AddActivityForm({
           <span className="font-medium text-zinc-700 dark:text-zinc-300">{durationLabel}</span>
         </p>
 
-        {error && <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>}
+        {error && (
+          <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">
+            {error}
+          </p>
+        )}
 
         <div className="mt-5 flex justify-end gap-2">
           <button
@@ -300,7 +301,8 @@ export function AddActivityForm({
           </button>
           <button
             type="submit"
-            className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:focus-visible:outline-zinc-100"
+            disabled={pending}
+            className="rounded-full bg-zinc-900 disabled:opacity-60 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:focus-visible:outline-zinc-100"
           >
             {mode === 'edit' ? 'Save changes' : 'Save activity'}
           </button>
