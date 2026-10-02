@@ -133,4 +133,4 @@ time slot only.
 
 Section 4 is being delivered one slice at a time through the Plan → Implement → Test workflow
 (see `CLAUDE.md`). Slice 1 (cross-midnight bug fix) shipped 2026-10-03; F1 (Firebase Hosting) is live at
-https://student-day-tracker.web.app; D-A (login) is resolved by ADR-007 (Firebase, F1–F3); D-B (goal ↔ category mapping) is still open.
+https://student-day-tracker.web.app; D-A (login) is resolved by ADR-007 (Firebase, F1–F3); D-B (goal ↔ category mapping) decided 2026-10-03 = option (iii).

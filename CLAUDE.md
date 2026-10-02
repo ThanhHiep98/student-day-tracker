@@ -18,7 +18,7 @@ Dexie on the device.
   and custom categories persist in Dexie, History reads the same data, Insights is computed from
   real data. v2 (`requirement/Requirement.txt`, `docs/REQUIREMENTS.md` §4) is in progress per
   `plans/2026-10-01-v2-roadmap-cross-midnight.html`: slice 1 (cross-midnight) shipped 2026-10-03; D-A is resolved by `architecture/ADR-007-firebase.md` (Firebase), planned in
-  `plans/2026-10-01-firebase-setup.html` (F1 Hosting + CI first); D-B (goal ↔ category) is open. Details in
+  `plans/2026-10-01-firebase-setup.html` (F1 Hosting + CI first); D-B (goal ↔ category) decided 2026-10-03 = option (iii): seed new default categories **and** let each onboarding goal pick/remap a category. Details in
   `docs/ARCHITECTURE.md` → "Status".
 
 ## Tech stack
@@ -122,8 +122,8 @@ Feature work is built through three subagents, chained by `/dev-flow`:
 ```
 
 - **`planner`** (`.claude/agents/planner.md`) — reads `requirement/Requirement.docx` + the
-  codebase, writes a concise, skimmable HTML plan to `plans/<date>-<slug>.html` (tables + one
-  inline SVG diagram, success-criteria checklist). May append new rules to this file's
+  codebase, writes a concise, skimmable HTML plan to `plans/<date>-<slug>.html` following the
+  "Plan template" below). May append new rules to this file's
   `## Coding Rules` section.
 - **`implementer`** (`.claude/agents/implementer.md`) — reads the latest plan + this file, builds
   test-first (pure helper + test, then Dexie/hook, then UI), runs `typecheck`/`check:fix`/`test`.
@@ -133,3 +133,34 @@ Feature work is built through three subagents, chained by `/dev-flow`:
 
 Run the whole chain with `/dev-flow [task description]`, or invoke an individual agent directly
 when only one step is needed (e.g. re-running `tester` after a manual fix).
+
+### Plan template
+
+Every `plans/<date>-<slug>.html` follows the outline of `plans/2026-09-26-add-activity.html`
+(user-guided; the `planner` agent enforces it):
+
+- **Header**: `<h1>Plan: …</h1>` + `.meta` line (date / "updated" date, requirement §, related
+  plans/ADRs as plain repo paths); once shipped, a bold status line or `.status` pill.
+- **`1. Frontend`** → `1.1 Scope` (one intro line + **Trong scope** / **Ngoài scope** bullet lists in
+  `ul.scope-list` — no dense paragraphs) · `1.2 Structure of UI` (sitemap diagram, then a mockup
+  per screen *reconstructed from the requirement* in HTML/CSS/SVG `.mock*` classes with the app's
+  real category colors — requirement images may be embedded base64 for confirmation — then a
+  requirement § → component → status table) · `1.3 Task`.
+- **`2. Backend`** → `2.1 Scope` · `2.2 Defaults (tạm chốt)` (# / Question / Default / Grounding —
+  unanswered open questions get a grounded working default, not a blocking Q&A) ·
+  `2.3 Requirements` (Section / User-visible behavior / Acceptance check) · `2.4 Flow` (diagram) ·
+  `2.5 Tasks` · `2.6 Testing strategy` (Layer / Proves / File) · `2.7 Success criteria`.
+  Drop `1.` or `2.` only when the slice has no UI or no data side, and say so in Scope.
+- **Task tables**: Phase / Step / File(s) / Depends on / Risk (`.risk-low|med|high`).
+- **Success criteria**: `ul.checklist` (☐); after a phase ships keep its list as
+  `ul.checklist.done` (☑, "shipped, for reference") rather than deleting it.
+- **Diagrams are inline SVG inside `.diagram`** — no Mermaid/JS/`<script>`, no external assets;
+  the file must render offline. Callouts use `.note`.
+- **New UI needs reviewable images before it is built.** When a slice adds or changes screens,
+  `1.2 Structure of UI` embeds screenshots (base64 WebP, desktop 1280×800 + mobile 390×844)
+  rendered with Playwright from the real app — live site or local build — with the new elements
+  injected, so fonts, tokens and layout are real. One numbered figure per screen/state (①②…) with
+  a caption, plus a `.review` callout asking the owner to approve by number. The owner approves
+  before `2. Backend` starts; approved images are the acceptance reference in `2.7`.
+- Vietnamese for section labels/defaults where the requirement is Vietnamese (Trong/Ngoài scope,
+  tạm chốt); English for code, paths and acceptance checks.
