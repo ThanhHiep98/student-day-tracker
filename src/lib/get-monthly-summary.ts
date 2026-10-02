@@ -1,3 +1,4 @@
+import { sessionKey } from './activity-span';
 import { activityNameKey } from './get-activity-analytics';
 import { type CategoryMinutes, getDailySummary } from './get-daily-summary';
 import { WEEKDAY_LONG_LABELS, filterByDateRange } from './get-weekly-summary';
@@ -59,25 +60,29 @@ export function getMonthlySummary(
 
   const minutesByWeekday = new Array<number>(7).fill(0);
   const trackedDates = new Set<IsoDate>();
-  const byName = new Map<string, { name: string; count: number; minutes: number; order: number }>();
+  const byName = new Map<
+    string,
+    { name: string; sessions: Set<string>; minutes: number; order: number }
+  >();
   for (const a of inMonth) {
     minutesByWeekday[daysBetween(startOfWeek(a.date), a.date)] += duration(a);
     trackedDates.add(a.date);
     const key = activityNameKey(a.name);
     const entry = byName.get(key) ?? {
       name: a.name.trim(),
-      count: 0,
+      sessions: new Set<string>(),
       minutes: 0,
       order: byName.size,
     };
-    entry.count++;
+    // A cross-midnight span is one occurrence, not two.
+    entry.sessions.add(sessionKey(a));
     entry.minutes += duration(a);
     byName.set(key, entry);
   }
 
   const mostActiveIndex = minutesByWeekday.indexOf(Math.max(...minutesByWeekday));
   const [mostCommon] = [...byName.values()].sort(
-    (a, b) => b.count - a.count || b.minutes - a.minutes || a.order - b.order
+    (a, b) => b.sessions.size - a.sessions.size || b.minutes - a.minutes || a.order - b.order
   );
   const monthIndex = Number(monthStart.slice(5, 7)) - 1;
 

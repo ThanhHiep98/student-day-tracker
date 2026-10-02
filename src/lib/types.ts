@@ -7,9 +7,14 @@
  * sorts lexicographically, and avoids timezone pitfalls when grouping by day
  * for History and Insights.
  *
- * `startMinutes` / `endMinutes` are minutes-since-midnight (0-1439) rather
- * than full timestamps, which keeps duration math (`end - start`) trivial and
- * timezone-independent within a single tracked day.
+ * `startMinutes` (0-1439) / `endMinutes` (1-1440, end-exclusive; 1440 means
+ * "ends at midnight") are minutes-since-midnight rather than full timestamps,
+ * which keeps duration math (`end - start`) trivial and timezone-independent
+ * within a single tracked day.
+ *
+ * An activity that crosses midnight is stored as two per-day rows sharing
+ * `spanId` (= the head row's id; the tail row's id is `${headId}-next`), so
+ * every row still lives on exactly one `date`. See activity-span.ts.
  */
 
 export type IsoDate = string;
@@ -32,5 +37,7 @@ export interface Activity {
   date: IsoDate;
   startMinutes: number;
   endMinutes: number;
+  /** Set on both rows of a cross-midnight activity (= head row id); unset for same-day rows. */
+  spanId?: string;
   createdAt: number;
 }

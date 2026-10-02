@@ -61,4 +61,20 @@ describe('getMonthlySummary', () => {
     expect(summary?.mostActiveDay).toBe('Tuesday');
     expect(summary?.averagePerDayMinutes).toBe(45);
   });
+
+  it('counts a cross-midnight span as one occurrence for the most common activity', () => {
+    const activities: Activity[] = [
+      { ...act('2026-09-07', 'Sleep', 'study', 1260, 1440), id: 's1', spanId: 's1' },
+      { ...act('2026-09-08', 'Sleep', 'study', 0, 60), id: 's1-next', spanId: 's1' },
+      act('2026-09-09', 'Read', 'study', 600, 630),
+      act('2026-09-10', 'Read', 'study', 600, 630),
+    ];
+    const summary = getMonthlySummary(activities, categories, '2026-09-01');
+    // Sleep is 1 session (240m), Read 2 sessions (60m): Read wins on count.
+    expect(summary?.mostCommonActivity).toBe('Read');
+    // Minutes stay split by day: 3h Mon + 1h Tue + 30m + 30m.
+    expect(summary?.totalMinutes).toBe(300);
+    expect(summary?.mostActiveDay).toBe('Monday');
+    expect(summary?.averagePerDayMinutes).toBe(75);
+  });
 });

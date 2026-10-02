@@ -8,6 +8,15 @@ export function toIsoDate(date: Date): IsoDate {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * True for a strict `YYYY-MM-DD` string naming a real calendar date
+ * (rejects `2026-02-29`, `2026-04-31`, single-digit parts, etc.).
+ */
+export function isIsoDate(value: string): value is IsoDate {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return toIsoDate(fromIsoDate(value)) === value;
+}
+
 /** Parse a `YYYY-MM-DD` string as a local-midnight Date. */
 export function fromIsoDate(iso: IsoDate): Date {
   const [y, m, d] = iso.split('-').map(Number);

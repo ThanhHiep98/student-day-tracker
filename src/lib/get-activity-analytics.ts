@@ -1,3 +1,4 @@
+import { isSpanTail, sessionKey } from './activity-span';
 import { getTimeBucket } from './get-time-bucket';
 import type { Activity } from './types';
 
@@ -22,6 +23,10 @@ export function activityNameKey(name: string): string {
 /**
  * Req. 3.4 Activity Analytics: group activities by name (trimmed,
  * case-insensitive) and summarise each group, sorted by total time desc.
+ *
+ * A session is one `sessionKey` (both rows of a cross-midnight span count
+ * once, with their minutes summed); its time bucket is the head row's start,
+ * or the tail's when only the tail is in range.
  */
 export function getActivityAnalytics(activities: Activity[]): ActivityAnalytics[] {
   const ordered = [...activities].sort(
@@ -38,11 +43,19 @@ export function getActivityAnalytics(activities: Activity[]): ActivityAnalytics[
 
   return [...groups.entries()]
     .map(([key, group]): ActivityAnalytics => {
-      const durations = group.map((a) => Math.max(0, a.endMinutes - a.startMinutes));
+      const sessions = new Map<string, { minutes: number; start: Activity }>();
+      for (const a of group) {
+        const k = sessionKey(a);
+        const session = sessions.get(k) ?? { minutes: 0, start: a };
+        session.minutes += Math.max(0, a.endMinutes - a.startMinutes);
+        if (isSpanTail(session.start) && !isSpanTail(a)) session.start = a;
+        sessions.set(k, session);
+      }
+      const durations = [...sessions.values()].map((s) => s.minutes);
       const totalMinutes = durations.reduce((sum, d) => sum + d, 0);
 
       const bucketCounts = new Map<number, number>();
-      for (const a of group) {
+      for (const { start: a } of sessions.values()) {
         const start = getTimeBucket(a.startMinutes).start;
         bucketCounts.set(start, (bucketCounts.get(start) ?? 0) + 1);
       }
@@ -52,8 +65,8 @@ export function getActivityAnalytics(activities: Activity[]): ActivityAnalytics[
         key,
         name: group[0].name.trim(),
         totalMinutes,
-        sessions: group.length,
-        averageSessionMinutes: Math.round(totalMinutes / group.length),
+        sessions: sessions.size,
+        averageSessionMinutes: Math.round(totalMinutes / sessions.size),
         longestSessionMinutes: Math.max(...durations),
         mostCommonTime: getTimeBucket(bestBucket[0]).label,
       };

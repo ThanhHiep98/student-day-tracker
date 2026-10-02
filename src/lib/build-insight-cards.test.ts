@@ -78,6 +78,32 @@ describe('buildInsightCards', () => {
     });
   });
 
+  describe('Your routine with cross-midnight spans', () => {
+    const sleep = (id: string, d1: string, d2: string): Activity[] => [
+      { ...act(d1, 'exercise', 1320, 1440), id, spanId: id },
+      { ...act(d2, 'exercise', 0, 60), id: `${id}-next`, spanId: id },
+    ];
+
+    it('does not invent a 00:00 routine from span tails', () => {
+      const activities = [
+        ...sleep('s1', '2026-09-28', '2026-09-29'),
+        ...sleep('s2', '2026-09-29', '2026-09-30'),
+        ...sleep('s3', '2026-09-30', '2026-10-01'),
+      ];
+      expect(card(activities, 'routine')?.body).toBe(
+        'You usually do Exercise around 21:00–24:00 — 3 sessions this week.'
+      );
+    });
+
+    it('counts each span once', () => {
+      const activities = [
+        ...sleep('s1', '2026-09-28', '2026-09-29'),
+        ...sleep('s2', '2026-09-29', '2026-09-30'),
+      ];
+      expect(card(activities, 'routine')).toBeUndefined();
+    });
+  });
+
   describe('Your pattern', () => {
     it('is omitted with only 1 tracked day', () => {
       expect(card([act('2026-09-29', 'work', 0, 120)], 'pattern')).toBeUndefined();

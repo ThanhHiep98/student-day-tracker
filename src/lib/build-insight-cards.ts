@@ -1,3 +1,4 @@
+import { isSpanTail } from './activity-span';
 import { formatMinutes } from './get-daily-summary';
 import { getTimeBucket } from './get-time-bucket';
 import { WEEKDAY_LONG_LABELS, filterByDateRange } from './get-weekly-summary';
@@ -73,12 +74,14 @@ export function buildInsightCards(
     });
   }
 
-  // Your routine — most frequent (category, 3-hour start bucket).
+  // Your routine — most frequent (category, 3-hour start bucket). Span tails
+  // are skipped: they always start at 00:00 and belong to the head's session.
   const routineCounts = new Map<
     string,
     { categoryId: string; bucketStart: number; count: number }
   >();
   for (const a of week) {
+    if (isSpanTail(a)) continue;
     const bucketStart = getTimeBucket(a.startMinutes).start;
     const key = `${a.categoryId}|${bucketStart}`;
     const entry = routineCounts.get(key) ?? { categoryId: a.categoryId, bucketStart, count: 0 };
