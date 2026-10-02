@@ -1,52 +1,82 @@
+import {
+  getDoc,
+  getDocFromCache,
+  getDocs,
+  getDocsFromCache,
+  query,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
 import { type ActivityInput, buildUpdatedActivity } from './build-activity';
-import { db } from './db';
+import { type UserScope, activitiesCol, activityDoc } from './firestore-paths';
 import type { Activity, Category } from './types';
+import { trackWrite } from './use-sync-status';
 
 /**
- * Dexie writes for activities. Every operation acts on all stored rows of one
- * activity (one row, or both rows of a cross-midnight span) inside a single
- * `rw` transaction, so a span is never left half-written. Validation lives in
- * the pure builders (build-activity.ts); a thrown message aborts the
- * transaction and propagates to the form.
+ * Firestore writes for activities (plan §2.4). Every operation acts on all
+ * stored rows of one activity — one row, or both rows of a cross-midnight
+ * span — in a single `writeBatch`, so a span is never left half-written.
+ *
+ * Writes are fire-and-forget: the batch is applied to the local cache at once
+ * (the live queries re-render, the form can close) and handed to
+ * `trackWrite()`; it is never awaited, because offline a commit only resolves
+ * once the server acknowledged it. Validation still happens synchronously in
+ * the pure builders, so a thrown message reaches the form.
  */
 
+type ActivityRef = Pick<Activity, 'id' | 'spanId'>;
+
+const TAIL_ID_SUFFIX = '-next';
+
 /** Persist the row(s) returned by `buildActivity`. */
-export async function addActivityRows(rows: Activity[]): Promise<void> {
-  await db.transaction('rw', db.activities, async () => {
-    await db.activities.bulkAdd(rows);
-  });
+export function addActivityRows(scope: UserScope, rows: Activity[]): void {
+  const batch = writeBatch(scope.db);
+  for (const row of rows) batch.set(activityDoc(scope, row.id), row);
+  trackWrite(batch.commit());
 }
 
-/** All stored rows of the activity `row` belongs to (both rows for a span). */
-export async function getActivityRows(row: Pick<Activity, 'id' | 'spanId'>): Promise<Activity[]> {
+/**
+ * All stored rows of the activity `row` belongs to (both rows for a span).
+ * Reads the local cache first — the rows on screen are already cached, and
+ * this keeps Edit working offline — and asks the server only on a cache miss.
+ */
+export async function getActivityRows(scope: UserScope, row: ActivityRef): Promise<Activity[]> {
   if (row.spanId !== undefined) {
-    return db.activities.where('spanId').equals(row.spanId).toArray();
+    const spanQuery = query(activitiesCol(scope), where('spanId', '==', row.spanId));
+    const cached = await getDocsFromCache(spanQuery).catch(() => null);
+    const snapshot = cached && !cached.empty ? cached : await getDocs(spanQuery);
+    return snapshot.docs.map((d) => d.data());
   }
-  const stored = await db.activities.get(row.id);
+  const ref = activityDoc(scope, row.id);
+  const cached = await getDocFromCache(ref).catch(() => null);
+  const snapshot = cached?.exists() ? cached : await getDoc(ref);
+  const stored = snapshot.data();
   return stored ? [stored] : [];
 }
 
 /** Apply an edit made from either row of an activity to the whole activity. */
 export async function updateActivity(
-  row: Pick<Activity, 'id' | 'spanId'>,
+  scope: UserScope,
+  row: ActivityRef,
   input: ActivityInput,
   categories: Category[]
 ): Promise<void> {
-  await db.transaction('rw', db.activities, async () => {
-    const existing = await getActivityRows(row);
-    const { put, deleteIds } = buildUpdatedActivity(existing, input, categories);
-    if (deleteIds.length > 0) await db.activities.bulkDelete(deleteIds);
-    await db.activities.bulkPut(put);
-  });
+  const existing = await getActivityRows(scope, row);
+  const { put, deleteIds } = buildUpdatedActivity(existing, input, categories);
+  const batch = writeBatch(scope.db);
+  for (const id of deleteIds) batch.delete(activityDoc(scope, id));
+  for (const updated of put) batch.set(activityDoc(scope, updated.id), updated);
+  trackWrite(batch.commit());
 }
 
-/** Delete an activity — both rows when it is a span. */
-export async function deleteActivity(row: Pick<Activity, 'id' | 'spanId'>): Promise<void> {
-  await db.transaction('rw', db.activities, async () => {
-    if (row.spanId !== undefined) {
-      await db.activities.where('spanId').equals(row.spanId).delete();
-    } else {
-      await db.activities.delete(row.id);
-    }
-  });
+/**
+ * Delete an activity — both rows when it is a span. A span's row ids are
+ * derived from `spanId` (head = spanId, tail = `${spanId}-next`), so no read
+ * is needed and this works offline.
+ */
+export function deleteActivity(scope: UserScope, row: ActivityRef): void {
+  const ids = row.spanId !== undefined ? [row.spanId, `${row.spanId}${TAIL_ID_SUFFIX}`] : [row.id];
+  const batch = writeBatch(scope.db);
+  for (const id of ids) batch.delete(activityDoc(scope, id));
+  trackWrite(batch.commit());
 }
