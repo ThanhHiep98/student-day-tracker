@@ -119,6 +119,11 @@ automatically. No store.
 - ⚠️ If cross-component coordination grows beyond prop-passing + Dexie subscriptions, revisit —
   not preemptively.
 
+**Update (F2, 2026-10-03):** with [ADR-007](../architecture/ADR-007-firebase.md), Dexie's
+`useLiveQuery` became Firestore `onSnapshot` subscriptions (`lib/use-firestore-query.ts`). The
+no-store rule holds: auth state and sync status are two tiny module stores read through
+`useSyncExternalStore` (`lib/use-auth.ts`, `lib/use-sync-status.ts`), not a state library.
+
 ---
 
 ## ADR-005: Tailwind v4
