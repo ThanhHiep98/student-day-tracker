@@ -1,11 +1,11 @@
 /**
  * Core data model for Student Day Tracker.
  *
- * Two stores: `categories` (fixed defaults + user-created) and `activities`
- * (a single tracked block of time on a given day). `Activity.date` is an ISO
- * `YYYY-MM-DD` string (not a Date object) — it indexes cleanly in IndexedDB,
- * sorts lexicographically, and avoids timezone pitfalls when grouping by day
- * for History and Insights.
+ * Two collections per user (Firestore `users/{uid}/categories` — custom only,
+ * defaults live in code — and `users/{uid}/activities`, one tracked block of
+ * time on a given day). `Activity.date` is an ISO `YYYY-MM-DD` string (not a
+ * Date object) — it queries cleanly, sorts lexicographically, and avoids
+ * timezone pitfalls when grouping by day for History and Insights.
  *
  * `startMinutes` (0-1439) / `endMinutes` (1-1440, end-exclusive; 1440 means
  * "ends at midnight") are minutes-since-midnight rather than full timestamps,
@@ -40,4 +40,19 @@ export interface Activity {
   /** Set on both rows of a cross-midnight activity (= head row id); unset for same-day rows. */
   spanId?: string;
   createdAt: number;
+}
+
+/**
+ * `users/{uid}` in Firestore (plan §2.4). Timestamps are ms numbers, like
+ * `createdAt` above. `privacyAcceptedAt` = `createdAt`: the first sign-in is
+ * the acceptance of the privacy notice linked from the sign-in screen.
+ */
+export interface UserProfile {
+  displayName: string;
+  email: string;
+  photoURL: string | null;
+  createdAt: number;
+  privacyAcceptedAt: number;
+  /** Set once this account received a device's local (Dexie) data. */
+  migratedFromDexieAt?: number;
 }

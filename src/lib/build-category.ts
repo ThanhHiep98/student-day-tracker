@@ -5,9 +5,12 @@ export const CUSTOM_CATEGORY_PALETTE = ['#0ea5e9', '#8b5cf6', '#14b8a6', '#f9731
 
 const CUSTOM_CATEGORY_ICON = '🏷️';
 
+/** Longest category name; firestore.rules enforces the same limit. */
+export const CATEGORY_NAME_MAX = 50;
+
 /**
  * Build a user-created category (req. 1.3 "user có thể thêm các mục riêng").
- * Pure — `id`/`createdAt` are passed in; the caller does `db.categories.add`.
+ * Pure — `id`/`createdAt` are passed in; the caller persists it (category-writes.ts).
  * Names are trimmed and deduped case-insensitively against every existing
  * category, defaults included.
  */
@@ -18,6 +21,9 @@ export function buildCategory(
 ): Category {
   const name = rawName.trim();
   if (!name) throw new Error('Category name is required.');
+  if (name.length > CATEGORY_NAME_MAX) {
+    throw new Error(`Category name must be ${CATEGORY_NAME_MAX} characters or fewer.`);
+  }
   const lower = name.toLowerCase();
   if (existing.some((c) => c.name.trim().toLowerCase() === lower)) {
     throw new Error('That category already exists.');

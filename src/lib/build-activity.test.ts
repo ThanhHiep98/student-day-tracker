@@ -39,6 +39,14 @@ describe('buildActivity', () => {
     );
   });
 
+  it('caps the trimmed name at 200 characters (mirrors firestore.rules)', () => {
+    const [row] = buildActivity({ ...valid, name: ` ${'x'.repeat(200)} ` }, categories, meta);
+    expect(row.name).toHaveLength(200);
+    expect(() => buildActivity({ ...valid, name: 'x'.repeat(201) }, categories, meta)).toThrow(
+      'Name must be 200 characters or fewer.'
+    );
+  });
+
   it('rejects a missing or unknown category', () => {
     expect(() => buildActivity({ ...valid, categoryId: '' }, categories, meta)).toThrow(
       'Choose a category.'
