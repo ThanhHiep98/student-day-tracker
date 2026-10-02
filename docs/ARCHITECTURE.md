@@ -110,10 +110,9 @@ the app is served from the domain root.
 - **Workflows:** GitHub Actions runs typecheck, check, unit tests, and build, then
   `FirebaseExtended/action-hosting-deploy`. A merge to `master` deploys to the live channel.
   Each same-repo PR gets a preview channel (expires in 7 days), and its URL is posted as a PR
-  comment. The service-account secret is referenced by name only.
-  *(Pending: the workflows and `.firebaserc` land once the Firebase project exists. That is
-  phase B of the plan.)*
-- **Live URL:** `https://<projectId>.web.app` *(placeholder until the first deploy)*.
+  comment. The service-account secret (`FIREBASE_SERVICE_ACCOUNT_STUDENT_DAY_TRACKER`) is
+  referenced by name only; `.firebaserc` points at project `student-day-tracker`.
+- **Live URL:** `https://student-day-tracker.web.app` *(live after the first merge to `master`)*.
 - **Local check, no credentials:** `pnpm build && pnpm test:e2e:hosting` starts the Hosting
   emulator (`pnpm emulators:hosting`, port 5002, fake project `demo-sdt`, no `firebase login`)
   and runs `tests/e2e/hosting.spec.ts`. That spec checks routes, the redirect, the 404, cache
