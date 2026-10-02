@@ -7,24 +7,29 @@ Instructions for Claude Code (and the project's own subagents) working in this r
 **Student Day Tracker** — an offline-first PWA where a student logs daily activities against a
 category (Work / Study / Exercise / Entertainment, or their own), sees a "today" timeline and
 summary on **Home**, browses past days on a calendar in **History**, and gets a narrative read of
-where their time goes in **Insights**. No backend, no auth — everything lives in IndexedDB via
-Dexie on the device.
+where their time goes in **Insights**. Students sign in with Google; their data lives in Cloud
+Firestore under `users/{uid}` with an offline cache, so the app keeps working without a network
+after the first sign-in (`architecture/ADR-007-firebase.md`). Hosted on Firebase Hosting:
+https://student-day-tracker.web.app.
 
 - Product requirements (source of truth): [`requirement/Requirement.docx`](./requirement/Requirement.docx),
   structured summary at [`docs/REQUIREMENTS.md`](./docs/REQUIREMENTS.md).
 - Technical design: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md),
-  [`docs/DECISIONS.md`](./docs/DECISIONS.md) (ADRs).
-- **Current status**: v1 (requirement sections 1–3) shipped 2026-10-01 — Home's add/edit/delete
-  and custom categories persist in Dexie, History reads the same data, Insights is computed from
-  real data. v2 (`requirement/Requirement.txt`, `docs/REQUIREMENTS.md` §4) is in progress per
-  `plans/2026-10-01-v2-roadmap-cross-midnight.html`: slice 1 (cross-midnight) shipped 2026-10-03; D-A is resolved by `architecture/ADR-007-firebase.md` (Firebase), planned in
-  `plans/2026-10-01-firebase-setup.html` (F1 Hosting + CI first); D-B (goal ↔ category) decided 2026-10-03 = option (iii): seed new default categories **and** let each onboarding goal pick/remap a category. Details in
-  `docs/ARCHITECTURE.md` → "Status".
+  [`docs/DECISIONS.md`](./docs/DECISIONS.md) (ADR-001…006), [`architecture/`](./architecture/)
+  (ADR-007 Firebase, ADR-008 onboarding, ADR-009 feedback loop + parent view).
+- **Current status**: v1 (requirement sections 1–3) shipped 2026-10-01. v2
+  (`requirement/Requirement.txt`, `docs/REQUIREMENTS.md` §4) per
+  `plans/2026-10-01-v2-roadmap-cross-midnight.html`: slice 1 (cross-midnight) and F1 (Firebase
+  Hosting + CI) shipped 2026-10-03; **F2 (Google sign-in, Firestore data layer, one-time Dexie
+  migration, Security Rules; demo mode retired)** built on `feat/f2-auth-firestore`, live after
+  merge + rules deploy. Next: slice 2 onboarding (ADR-008, accepted); slices 3/4/5/8 + F3 designed
+  in ADR-009 (in review, GitHub issue #3). Details in `docs/ARCHITECTURE.md` → "Status".
 
 ## Tech stack
 
 Next.js 16 (App Router, static export) · React 19 · TypeScript strict · Tailwind CSS v4 ·
-Dexie (IndexedDB) · Serwist (`@serwist/next`, PWA) · `d3-scale`/`d3-time-format` (Insights charts,
+Firebase (Auth with Google, Cloud Firestore with persistent offline cache, Hosting; AI Logic +
+App Check planned in F3) · Dexie (frozen, read only as the one-time migration source) · Serwist (`@serwist/next`, PWA) · `d3-scale`/`d3-time-format` (Insights charts,
 no chart library) · Vitest · Playwright + `@axe-core/playwright` · Biome · pnpm.
 
 ## Repo structure
@@ -32,8 +37,11 @@ no chart library) · Vitest · Playwright + `@axe-core/playwright` · Biome · p
 ```
 src/app/            Next.js routes: /  /history  /insights, layout, manifest, service worker
 src/components/     Flat, co-located tests, no barrels
-src/lib/            Dexie client, pure helpers (+ tests), use-* hooks
-tests/e2e/          Playwright: route smoke tests, a11y
+src/lib/            Firebase client, Firestore paths/converters/*-writes, pure helpers (+ tests), use-* hooks
+tests/e2e/          Playwright against Auth + Firestore emulators: flows, a11y, hosting
+tests/rules/        Security Rules tests (@firebase/rules-unit-testing, emulator)
+tests/emulator/     Firestore integration + migration tests (emulator)
+firestore.rules     Security Rules — deployed by the owner, not CI
 docs/               REQUIREMENTS.md, ARCHITECTURE.md, DECISIONS.md (ADR-001…006)
 architecture/       One .md per ADR from ADR-007 on (context/decision/consequences + Mermaid UD/AD)
 requirement/        Original Requirement.docx (source of truth — don't edit; re-export instead)
@@ -48,16 +56,15 @@ plans/              HTML implementation plans produced by the planner agent
 planning. Keep entries terse; don't restate what's already here.)*
 
 - **TypeScript strict**, no `any` without a comment explaining why it's unavoidable.
-- **Pure logic lives in `src/lib/*.ts`, tested without Dexie.** Any aggregation, validation, or
+- **Pure logic lives in `src/lib/*.ts`, tested without Firebase.** Any aggregation, validation, or
   formatting rule (e.g. `getDailySummary`, `buildMonthGrid`) is a plain function over
-  arrays/primitives with a co-located `*.test.ts`. Dexie itself only gets exercised in
-  `db.integration.test.ts` via `fake-indexeddb`.
+  arrays/primitives with a co-located `*.test.ts`. Firestore is exercised only in
+  `tests/emulator/` and `tests/rules/` (`pnpm test:emulator`).
 - **Dates are `YYYY-MM-DD` strings** (`IsoDate`), never `Date` objects, in stored data and store
   keys — see `docs/ARCHITECTURE.md`. Time-of-day is **minutes since midnight** (`0-1439`), not
   timestamps.
-- **Dexie schema changes are additive.** Add a new `.version(n).stores(...)` block in `db.ts`;
-  never mutate an existing `.version()` call. *(F2: Dexie is frozen at `version(2)` and read only
-  as the migration source.)*
+- **Dexie is frozen at `version(2)`** and read only as the one-time migration source; never add
+  versions or write to it.
 - **No barrel files** (no `index.ts` re-exports) and **no `utils/` dump folder** — every helper is
   a named module (`get-daily-summary.ts`, not `helpers.ts`).
 - **Hooks live in `lib/` as `use-*.ts`**, not in a separate `hooks/` folder.
@@ -68,32 +75,31 @@ planning. Keep entries terse; don't restate what's already here.)*
   works end-to-end.** Never ship a button that silently no-ops.
 - **Zero axe-core violations** on every route — this is a CI-equivalent gate, not a suggestion.
 - **Biome, not ESLint/Prettier**, for lint + format (`pnpm check` / `pnpm check:fix`).
+- **Local dev without credentials:** `pnpm emulators` (Auth + Firestore, project `demo-sdt`) +
+  `pnpm dev:emu`. Plain `pnpm dev` talks to the real project. Gates: `pnpm typecheck`, `check`,
+  `test`, `test:emulator` (JDK 21), `build`, `test:e2e`, `test:e2e:hosting`.
 - Commit messages and code comments in English; product/requirement language stays in Vietnamese
   where the source docx is Vietnamese — don't translate `docs/REQUIREMENTS.md`'s quoted
   requirement text.
 - **Write-side pure builders are named `build*`, never `add*`** (`buildActivity`,
   `buildUpdatedActivity`, `buildCategory` in `build-activity.ts` / `build-category.ts`): they
-  don't touch Dexie and receive `id`/`createdAt` as arguments; the caller does the `db.*` write.
+  don't touch Firestore and receive `id`/`createdAt` as arguments; the caller writes through
+  `*-writes.ts`.
   They throw synchronously on invalid input (empty name, start = end time, invalid date,
   unknown/duplicate category); the UI catches and shows the message inline, never silently drops
   input. Custom category names are deduped case-insensitively against all categories.
 - **Pure helpers never read the clock** — `today`, `weekStart`, `monthStart` are passed in as
   `IsoDate` args. Weeks are **Monday-start calendar weeks** (matching History), months are
   calendar months.
-- **Demo rows are identified by an `id` prefix of `demo-`**, not by a schema field or a
-  localStorage id list; clearing demo data deletes only `demo-*` rows. *(F2 retires demo mode;
-  the prefix then only marks rows the migration skips.)*
+- **Demo mode is retired** (F2): no demo seeding or banner. The `demo-` id prefix only marks old
+  local rows that the migration skips.
 - **Cross-midnight activities are stored as two per-day rows** sharing `spanId` (= the head row's
   `id`; the tail row's id is `${headId}-next`). `startMinutes` is 0-1439; `endMinutes` is
   end-exclusive 1-1440, where 1440 means "ends at midnight". Edit and delete always act on the
-  whole span in one Dexie `rw` transaction. Anything that counts sessions (not minutes) counts
+  whole span in one Firestore `writeBatch`. Anything that counts sessions (not minutes) counts
   distinct `spanId ?? id`. See `plans/2026-10-01-v2-roadmap-cross-midnight.html`.
-- **Per-user data from v2 on (goals, ratings, stickers) is keyed by `profileId`**, which is
-  `'local'` until the auth decision (D-A) lands, so that local profiles can be added later
-  without rewriting stores. *(Obsolete once F2 ships: D-A is resolved by
-  `architecture/ADR-007-firebase.md`; per-user data then lives under the `users/{uid}/…` path, with no
-  `profileId` field. The Dexie rules above (additive `.version()`, `fake-indexeddb` integration
-  test) also retire with F2; see `plans/2026-10-01-firebase-setup.html`.)*
+- **Per-user data lives under `users/{uid}/…`** (activities, categories, goals, ratings, summaries);
+  there is no `profileId` field.
 - **Firestore era (F2+):** Firestore access lives only in `src/lib/firebase.ts`,
   `firestore-paths.ts`, `*-writes.ts`, `user-profile.ts`, `migrate-local-data.ts` and `use-*`
   hooks; write functions take a `UserScope` (`{ db, uid }`). Docs keep today's ids/fields (`id`
@@ -139,9 +145,10 @@ Feature work is built through three subagents, chained by `/dev-flow`:
   "Plan template" below). May append new rules to this file's
   `## Coding Rules` section.
 - **`implementer`** (`.claude/agents/implementer.md`) — reads the latest plan + this file, builds
-  test-first (pure helper + test, then Dexie/hook, then UI), runs `typecheck`/`check:fix`/`test`.
+  test-first (pure helper + test, then Firestore hook/writes + rules, then UI), runs
+  `typecheck`/`check:fix`/`test`/`test:emulator`.
 - **`tester`** (`.claude/agents/tester.md`) — runs the full suite (`typecheck`, `check`, `test`,
-  `build`, `test:e2e`), grades it against the plan's success criteria and the requirement doc,
+  `test:emulator`, `build`, `test:e2e`, `test:e2e:hosting`), grades it against the plan's success criteria and the requirement doc,
   reports `SHIP` or `NEEDS WORK` with specifics.
 
 Run the whole chain with `/dev-flow [task description]`, or invoke an individual agent directly
