@@ -17,8 +17,7 @@ Dexie on the device.
 - **Current status**: v1 (requirement sections 1–3) shipped 2026-10-01 — Home's add/edit/delete
   and custom categories persist in Dexie, History reads the same data, Insights is computed from
   real data. v2 (`requirement/Requirement.txt`, `docs/REQUIREMENTS.md` §4) is in progress per
-  `plans/2026-10-01-v2-roadmap-cross-midnight.html`: slice 1 (cross-midnight) is planned, not
-  built; D-A is resolved by `architecture/ADR-007-firebase.md` (Firebase), planned in
+  `plans/2026-10-01-v2-roadmap-cross-midnight.html`: slice 1 (cross-midnight) shipped 2026-10-03; D-A is resolved by `architecture/ADR-007-firebase.md` (Firebase), planned in
   `plans/2026-10-01-firebase-setup.html` (F1 Hosting + CI first); D-B (goal ↔ category) is open. Details in
   `docs/ARCHITECTURE.md` → "Status".
 

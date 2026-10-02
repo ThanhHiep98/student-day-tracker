@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, endOfMonth, fromIsoDate, startOfMonth, startOfWeek, toIsoDate } from './iso-date';
+import {
+  addDays,
+  endOfMonth,
+  fromIsoDate,
+  isIsoDate,
+  startOfMonth,
+  startOfWeek,
+  toIsoDate,
+} from './iso-date';
 
 describe('toIsoDate', () => {
   it('formats a Date as YYYY-MM-DD', () => {
@@ -64,5 +72,33 @@ describe('startOfMonth / endOfMonth', () => {
 
   it('handles December', () => {
     expect(endOfMonth('2026-12-05')).toBe('2026-12-31');
+  });
+});
+
+describe('isIsoDate', () => {
+  it('accepts real calendar dates in YYYY-MM-DD form', () => {
+    expect(isIsoDate('2026-10-01')).toBe(true);
+    expect(isIsoDate('2028-02-29')).toBe(true);
+    expect(isIsoDate('2026-12-31')).toBe(true);
+  });
+
+  it('rejects malformed strings', () => {
+    for (const value of [
+      '',
+      '2026-1-01',
+      '2026-10-1',
+      '26-10-01',
+      '2026/10/01',
+      ' 2026-10-01',
+      'abcd-ef-gh',
+    ]) {
+      expect(isIsoDate(value)).toBe(false);
+    }
+  });
+
+  it('rejects impossible calendar dates', () => {
+    for (const value of ['2026-02-29', '2026-13-01', '2026-00-10', '2026-04-31', '2026-10-00']) {
+      expect(isIsoDate(value)).toBe(false);
+    }
   });
 });

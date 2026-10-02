@@ -8,12 +8,13 @@ import type { Activity, Category } from './types';
  * for Insights) lives in pure helpers next to their tests, so it can be
  * exercised without touching IndexedDB. See docs/ARCHITECTURE.md.
  */
-class StudentDayTrackerDB extends Dexie {
+export class StudentDayTrackerDB extends Dexie {
   categories!: EntityTable<Category, 'id'>;
   activities!: EntityTable<Activity, 'id'>;
 
-  constructor() {
-    super('student-day-tracker');
+  /** `name` is overridable only so the integration test can exercise a v1 → v2 upgrade. */
+  constructor(name = 'student-day-tracker') {
+    super(name);
 
     // `date` alone powers Home ("today") and History (calendar day lookup).
     // `[date+categoryId]` powers the daily-summary-by-category breakdown and
@@ -21,6 +22,13 @@ class StudentDayTrackerDB extends Dexie {
     this.version(1).stores({
       categories: 'id, isDefault, createdAt',
       activities: 'id, date, categoryId, [date+categoryId]',
+    });
+
+    // v2 (cross-midnight, plans/2026-10-01-v2-roadmap-cross-midnight.html):
+    // index `spanId` so Edit/Delete can load both rows of a span. Index-only,
+    // so no upgrade function — existing rows simply have no spanId.
+    this.version(2).stores({
+      activities: 'id, date, categoryId, [date+categoryId], spanId',
     });
 
     this.on('populate', () => {

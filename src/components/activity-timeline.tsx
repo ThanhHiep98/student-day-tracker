@@ -1,4 +1,5 @@
 import { EmptyState } from '@/components/empty-state';
+import { isSpanTail } from '@/lib/activity-span';
 import { formatMinutes } from '@/lib/get-daily-summary';
 import type { Activity, Category } from '@/lib/types';
 
@@ -9,6 +10,13 @@ interface ActivityTimelineProps {
   onDelete?: (activity: Activity) => void;
 }
 
+/** Suffix for a row that is one half of a cross-midnight span. */
+function spanSuffix(activity: Activity): string {
+  if (activity.spanId === undefined) return '';
+  return isSpanTail(activity) ? ' · from previous day' : ' · continues next day';
+}
+
+/** HH:MM; an end of 1440 (midnight) renders as 00:00. */
 function formatClock(minutes: number): string {
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
@@ -17,7 +25,9 @@ function formatClock(minutes: number): string {
 
 /**
  * Req. 1.2 "Today's Timeline" — the core of Home. Each row: icon, name,
- * category, start/end time, duration, edit/delete.
+ * category, start/end time, duration, edit/delete. A cross-midnight activity
+ * shows only this day's part, labelled "continues next day" / "from previous
+ * day"; Edit/Delete callers act on the whole span.
  *
  * Edit/Delete call back to the caller (`onEdit`/`onDelete`); omitting either
  * prop renders it disabled — History reuses this component read-only.
@@ -58,6 +68,7 @@ export function ActivityTimeline({
                 <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                   {category?.name ?? 'Uncategorized'} · {formatClock(activity.startMinutes)}–
                   {formatClock(activity.endMinutes)}
+                  {spanSuffix(activity)}
                 </p>
               </div>
               <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
