@@ -65,8 +65,8 @@ pnpm typecheck    # tsc --noEmit
 ## Deploy
 
 The app is deployed to **Firebase Hosting** from GitHub Actions: a merge to `master` deploys it
-live, and each PR gets a preview URL. Live URL: `https://<projectId>.web.app` *(placeholder
-until the first deploy)*. It replaces the old GitHub Pages deploy. Details are in
+live, and each PR gets a preview URL. Live URL: **https://student-day-tracker.web.app**. It replaces the old GitHub Pages deploy
+(unpublished 2026-10-03). Details are in
 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) under "Deploy".
 
 ## Project structure
