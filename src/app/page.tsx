@@ -11,7 +11,14 @@ import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { RecentActivityRail } from '@/components/recent-activity-rail';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TipCard } from '@/components/tip-card';
-import { buildActivity, buildUpdatedActivity } from '@/lib/build-activity';
+import { mergeActivitySpan } from '@/lib/activity-span';
+import {
+  addActivityRows,
+  deleteActivity,
+  getActivityRows,
+  updateActivity,
+} from '@/lib/activity-writes';
+import { buildActivity } from '@/lib/build-activity';
 import { buildCategory } from '@/lib/build-category';
 import { db } from '@/lib/db';
 import { getDailySummary } from '@/lib/get-daily-summary';
@@ -32,7 +39,7 @@ const GREETING_BY_HOUR = (hour: number) => {
 type FormState =
   | { open: false }
   | { open: true; mode: 'add' }
-  | { open: true; mode: 'edit'; activity: Activity };
+  | { open: true; mode: 'edit'; activity: Activity; initialValues: AddActivityFormValues };
 
 /**
  * Home — req. 1. Add/Edit/Delete Activity and "+ New category" build rows
@@ -40,6 +47,9 @@ type FormState =
  * validation and throw user-facing messages) and write them to Dexie; the
  * live queries re-render the Timeline and Daily summary. A builder or Dexie
  * error propagates to AddActivityForm, which shows it inline.
+ *
+ * A cross-midnight activity is two rows (activity-writes.ts): Edit opens the
+ * whole span from either row, and save/delete act on both in one transaction.
  */
 export default function Home() {
   const today = toIsoDate(new Date());
@@ -71,22 +81,27 @@ export default function Home() {
 
   async function handleSubmit(values: AddActivityFormValues) {
     if (formState.open && formState.mode === 'edit') {
-      await db.activities.put(buildUpdatedActivity(formState.activity, values, categories ?? []));
+      await updateActivity(formState.activity, values, categories ?? []);
     } else {
-      await db.activities.add(
+      await addActivityRows(
         buildActivity(values, categories ?? [], {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
-          date: today,
         })
       );
     }
     setFormState({ open: false });
   }
 
+  async function handleEdit(activity: Activity) {
+    const rows = await getActivityRows(activity);
+    if (rows.length === 0) return; // Already deleted; the live query will drop the row.
+    setFormState({ open: true, mode: 'edit', activity, initialValues: mergeActivitySpan(rows) });
+  }
+
   async function handleDeleteConfirmed() {
     if (confirmDelete) {
-      await db.activities.delete(confirmDelete.id);
+      await deleteActivity(confirmDelete);
       setConfirmDelete(null);
     }
   }
@@ -135,7 +150,7 @@ export default function Home() {
             <ActivityTimeline
               activities={activities}
               categories={categories}
-              onEdit={(activity) => setFormState({ open: true, mode: 'edit', activity })}
+              onEdit={handleEdit}
               onDelete={(activity) => setConfirmDelete(activity)}
             />
           </div>
@@ -150,7 +165,10 @@ export default function Home() {
         open={formState.open}
         mode={formState.open ? formState.mode : 'add'}
         categories={categories ?? []}
-        initialValues={formState.open && formState.mode === 'edit' ? formState.activity : undefined}
+        defaultDate={today}
+        initialValues={
+          formState.open && formState.mode === 'edit' ? formState.initialValues : undefined
+        }
         onSubmit={handleSubmit}
         onCancel={() => setFormState({ open: false })}
         onCreateCategory={handleCreateCategory}
@@ -161,7 +179,9 @@ export default function Home() {
         title="Delete this activity?"
         description={
           confirmDelete
-            ? `"${confirmDelete.name}" will be removed from today's timeline.`
+            ? confirmDelete.spanId !== undefined
+              ? `"${confirmDelete.name}" crosses midnight — this removes both days.`
+              : `"${confirmDelete.name}" will be removed from today's timeline.`
             : undefined
         }
         confirmLabel="Delete"

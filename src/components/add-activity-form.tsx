@@ -1,8 +1,9 @@
 'use client';
 
+import { spanDurationMinutes } from '@/lib/activity-span';
 import type { ActivityInput } from '@/lib/build-activity';
 import { formatMinutes } from '@/lib/get-daily-summary';
-import type { Category } from '@/lib/types';
+import type { Category, IsoDate } from '@/lib/types';
 import { useEffect, useId, useRef, useState } from 'react';
 
 export type AddActivityFormValues = ActivityInput;
@@ -11,6 +12,9 @@ interface AddActivityFormProps {
   open: boolean;
   mode: 'add' | 'edit';
   categories: Category[];
+  /** Start date used in add mode (the Home day). */
+  defaultDate: IsoDate;
+  /** Edit mode: the whole activity, merged from all its rows (mergeActivitySpan). */
   initialValues?: AddActivityFormValues;
   /** Persists the values; reject with a user-facing Error to keep the form open. */
   onSubmit: (values: AddActivityFormValues) => Promise<void>;
@@ -20,7 +24,7 @@ interface AddActivityFormProps {
 }
 
 function minutesToClock(minutes: number): string {
-  const h = Math.floor(minutes / 60);
+  const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
@@ -44,6 +48,9 @@ function errorMessage(err: unknown): string {
  * buildUpdatedActivity, which own all validation. Any thrown message is shown
  * inline and the dialog stays open; this form only parses HH:MM.
  *
+ * An end time earlier than the start time means the activity ends the next
+ * day (cross-midnight); the duration preview says so.
+ *
  * <dialog> pattern mirrors confirm-dialog.tsx: focus trap via showModal(),
  * Escape closes natively, backdrop click cancels.
  */
@@ -51,6 +58,7 @@ export function AddActivityForm({
   open,
   mode,
   categories,
+  defaultDate,
   initialValues,
   onSubmit,
   onCancel,
@@ -62,6 +70,7 @@ export function AddActivityForm({
 
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [date, setDate] = useState<string>(defaultDate);
   const [startTime, setStartTime] = useState(minutesToClock(DEFAULT_START));
   const [endTime, setEndTime] = useState(minutesToClock(DEFAULT_END));
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +98,7 @@ export function AddActivityForm({
     if (!open) return;
     setName(initialValues?.name ?? '');
     setCategoryId(initialValues?.categoryId ?? '');
+    setDate(initialValues?.date ?? defaultDate);
     setStartTime(minutesToClock(initialValues?.startMinutes ?? DEFAULT_START));
     setEndTime(minutesToClock(initialValues?.endMinutes ?? DEFAULT_END));
     setError(null);
@@ -97,7 +107,7 @@ export function AddActivityForm({
     setCategoryError(null);
     setPending(false);
     setCategoryPending(false);
-  }, [open, initialValues]);
+  }, [open, initialValues, defaultDate]);
 
   // Default to the first category once one is available, if none is set.
   useEffect(() => {
@@ -140,6 +150,7 @@ export function AddActivityForm({
       await onSubmit({
         name,
         categoryId,
+        date,
         // Unparseable input becomes NaN, which the builder rejects with
         // "Enter a valid start and end time."
         startMinutes: clockToMinutes(startTime) ?? Number.NaN,
@@ -155,10 +166,15 @@ export function AddActivityForm({
 
   const startMinutes = clockToMinutes(startTime);
   const endMinutes = clockToMinutes(endTime);
+  const duration =
+    startMinutes !== null && endMinutes !== null
+      ? spanDurationMinutes(startMinutes, endMinutes)
+      : 0;
+  // 00:00 as the end means "ends at midnight" on the start date, not next day.
+  const endsNextDay =
+    duration > 0 && endMinutes !== null && endMinutes !== 0 && endMinutes < (startMinutes ?? 0);
   const durationLabel =
-    startMinutes !== null && endMinutes !== null && endMinutes > startMinutes
-      ? formatMinutes(endMinutes - startMinutes)
-      : '—';
+    duration > 0 ? `${formatMinutes(duration)}${endsNextDay ? ' · ends next day' : ''}` : '—';
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop click is a mouse-only affordance; keyboard users cancel via Escape, handled natively by <dialog>
@@ -245,6 +261,22 @@ export function AddActivityForm({
               {categoryError}
             </p>
           )}
+        </div>
+
+        <div>
+          <label
+            htmlFor="activity-date"
+            className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+          >
+            Start date
+          </label>
+          <input
+            id="activity-date"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
