@@ -20,3 +20,29 @@ export function addDays(iso: IsoDate, days: number): IsoDate {
   date.setDate(date.getDate() + days);
   return toIsoDate(date);
 }
+
+/** Monday of the calendar week containing `iso` (weeks run Mon–Sun, matching History). */
+export function startOfWeek(iso: IsoDate): IsoDate {
+  const weekday = fromIsoDate(iso).getDay(); // 0 = Sunday
+  const daysSinceMonday = (weekday + 6) % 7;
+  return addDays(iso, -daysSinceMonday);
+}
+
+/** First day of the calendar month containing `iso`. */
+export function startOfMonth(iso: IsoDate): IsoDate {
+  return `${iso.slice(0, 7)}-01`;
+}
+
+/** Last day of the calendar month containing `iso`. */
+export function endOfMonth(iso: IsoDate): IsoDate {
+  const [y, m] = iso.split('-').map(Number);
+  // Day 0 of the next month is the last day of this one.
+  return toIsoDate(new Date(y, m, 0));
+}
+
+/** Whole days from `from` to `to` (positive when `to` is later). */
+export function daysBetween(from: IsoDate, to: IsoDate): number {
+  const ms = fromIsoDate(to).getTime() - fromIsoDate(from).getTime();
+  // Round to absorb DST shifts of ±1h between two local midnights.
+  return Math.round(ms / 86_400_000);
+}

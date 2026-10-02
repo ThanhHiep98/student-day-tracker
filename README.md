@@ -57,9 +57,17 @@ pnpm start        # serve the production build
 pnpm test         # unit tests (Vitest)
 pnpm test:coverage
 pnpm test:e2e     # end-to-end tests (Playwright + axe) — run `npx playwright install` once first
+pnpm test:e2e:hosting  # after `pnpm build`: E2E against the Firebase Hosting emulator (no login needed)
 pnpm check        # Biome (lint + format)
 pnpm typecheck    # tsc --noEmit
 ```
+
+## Deploy
+
+The app is deployed to **Firebase Hosting** from GitHub Actions: a merge to `master` deploys it
+live, and each PR gets a preview URL. Live URL: `https://<projectId>.web.app` *(placeholder
+until the first deploy)*. It replaces the old GitHub Pages deploy. Details are in
+[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) under "Deploy".
 
 ## Project structure
 

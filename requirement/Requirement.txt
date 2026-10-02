@@ -1,0 +1,10 @@
+Người dùng ở đây là học sinh và đang tham gia quá trình thi Đại học. Hãy hỗ trợ để phát triển 1 app có thể hỗ trợ gợi ý cho học sinh và phụ huynh
+
+- Cho quyền add thêm các sticker nhãn dán, hãy tham khảo facebook để phát triển tính năng này.
+- Fix bug: Khi nhập activity từ 21:00 của ngày hôm trước đến 1:00 hôm sau không được
+- Tạo User và đăng nhập.
+- Ở lần đầu tiên, đưa ra các gợi ý đề habit của người sử dụng app (ví dụ: mong muốn ngủ bao nhiêu tiếng ban đêm, thời gian bắt đầu ngủ, đi học, giải trí, các vấn đề khác), đặt khoảng 5 câu hỏi.
+- Với những thông tin được User cung cấp thì sẽ đưa ra cảnh báo nếu activity cảu User đang vi phạm. Đưa ra nhận xét cho người dùng.
+vd: 1 ngày nhu cầu cần học bao nhiêu (bao nhiêu thời gian trên trường, bao nhiêu thời gian học thêm, bao nhiêu tgian tự học; ăn trong bao lâu, giải trí, ngủ, các vấn đề khác...) 
+Khi học sinh đăng nhập sẽ dựa vào chuẩn đầu vào tính % hiệu quả đưa ra nhận xét
+- Đánh giá mức độ hài lòng trong ngày

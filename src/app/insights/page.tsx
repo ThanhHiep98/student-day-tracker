@@ -2,34 +2,53 @@
 
 import { ActivityAnalyticsPanel } from '@/components/activity-analytics-panel';
 import { ComparePanel } from '@/components/compare-panel';
+import { DemoBanner } from '@/components/demo-banner';
 import { InsightCards } from '@/components/insight-cards';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { MonthlyOverviewCard } from '@/components/monthly-overview-card';
 import { WeeklyOverviewChart } from '@/components/weekly-overview-chart';
-import {
-  MOCK_ACTIVITY_ANALYTICS,
-  MOCK_INSIGHT_CARDS,
-  MOCK_LAST_WEEK_BY_CATEGORY,
-  MOCK_MONTHLY_OVERVIEW,
-  MOCK_WEEKLY_BY_CATEGORY,
-  MOCK_WEEKLY_DAYS,
-} from '@/lib/insights-mock-fixture';
+import { buildInsightCards } from '@/lib/build-insight-cards';
+import { getWeekToDateComparison } from '@/lib/compare-periods';
+import { getActivityAnalytics } from '@/lib/get-activity-analytics';
+import { getMonthlySummary } from '@/lib/get-monthly-summary';
+import { filterByDateRange, getWeeklySummary } from '@/lib/get-weekly-summary';
+import { addDays, startOfMonth, startOfWeek, toIsoDate } from '@/lib/iso-date';
+import { useActivitiesRange } from '@/lib/use-activities-range';
 import { useCategories } from '@/lib/use-categories';
 import { useDemoData } from '@/lib/use-demo-data';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 /**
  * Insights — req. 3: turn raw totals into narrative ("Bạn đang dành thời
- * gian cho điều gì?", not just "Work = 20h"). Categories come from real
- * Dexie data; the aggregated numbers themselves are still a static fixture
- * (src/lib/insights-mock-fixture.ts) — Backend phase (plan §2.2/§2.3)
- * replaces the fixture with real aggregation over live Dexie data. See
- * CLAUDE.md.
+ * gian cho điều gì?", not just "Work = 20h"). One live Dexie range query
+ * covers last week's comparison span and this month; each section is then
+ * derived by a pure helper. Weeks are Mon–Sun, months are calendar months.
  */
 export default function InsightsPage() {
-  useDemoData(); // seeds the same demo activities Home/History use — see that hook
+  const { isDemo, clearDemo } = useDemoData();
   const categories = useCategories();
-  const [selectedActivity, setSelectedActivity] = useState(MOCK_ACTIVITY_ANALYTICS[0].name);
+  const [selectedActivity, setSelectedActivity] = useState<string | null>(null);
+
+  // The clock is read here, once per render — every helper below takes dates as args.
+  const today = toIsoDate(new Date());
+  const weekStart = startOfWeek(today);
+  const monthStart = startOfMonth(today);
+  const prevWeekStart = addDays(weekStart, -7);
+  const rangeStart = prevWeekStart < monthStart ? prevWeekStart : monthStart;
+
+  const activities = useActivitiesRange(rangeStart, today);
+
+  const derived = useMemo(() => {
+    if (!activities || !categories) return undefined;
+    const monthActivities = filterByDateRange(activities, monthStart, today);
+    return {
+      weekly: getWeeklySummary(activities, categories, weekStart),
+      compare: getWeekToDateComparison(activities, categories, { weekStart, today }),
+      cards: buildInsightCards(activities, categories, { weekStart, today }),
+      monthly: getMonthlySummary(monthActivities, categories, monthStart),
+      analytics: getActivityAnalytics(monthActivities),
+    };
+  }, [activities, categories, weekStart, monthStart, today]);
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 px-4 py-8 sm:px-8">
@@ -40,25 +59,19 @@ export default function InsightsPage() {
         </p>
       </header>
 
-      {categories === undefined ? (
+      {isDemo && <DemoBanner onClear={clearDemo} />}
+
+      {derived === undefined || categories === undefined ? (
         <LoadingSkeleton />
       ) : (
         <>
-          <WeeklyOverviewChart
-            days={MOCK_WEEKLY_DAYS}
-            byCategory={MOCK_WEEKLY_BY_CATEGORY}
-            categories={categories}
-          />
-          <ComparePanel
-            current={MOCK_WEEKLY_BY_CATEGORY}
-            previous={MOCK_LAST_WEEK_BY_CATEGORY}
-            categories={categories}
-          />
-          <InsightCards cards={MOCK_INSIGHT_CARDS} />
-          <MonthlyOverviewCard {...MOCK_MONTHLY_OVERVIEW} categories={categories} />
+          <WeeklyOverviewChart {...derived.weekly} categories={categories} />
+          <ComparePanel result={derived.compare} categories={categories} />
+          <InsightCards cards={derived.cards} />
+          <MonthlyOverviewCard summary={derived.monthly} categories={categories} />
           <ActivityAnalyticsPanel
-            activities={MOCK_ACTIVITY_ANALYTICS}
-            selectedName={selectedActivity}
+            activities={derived.analytics}
+            selectedKey={selectedActivity}
             onSelect={setSelectedActivity}
           />
         </>
