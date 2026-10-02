@@ -56,7 +56,8 @@ planning. Keep entries terse; don't restate what's already here.)*
   keys — see `docs/ARCHITECTURE.md`. Time-of-day is **minutes since midnight** (`0-1439`), not
   timestamps.
 - **Dexie schema changes are additive.** Add a new `.version(n).stores(...)` block in `db.ts`;
-  never mutate an existing `.version()` call.
+  never mutate an existing `.version()` call. *(F2: Dexie is frozen at `version(2)` and read only
+  as the migration source.)*
 - **No barrel files** (no `index.ts` re-exports) and **no `utils/` dump folder** — every helper is
   a named module (`get-daily-summary.ts`, not `helpers.ts`).
 - **Hooks live in `lib/` as `use-*.ts`**, not in a separate `hooks/` folder.
@@ -80,7 +81,8 @@ planning. Keep entries terse; don't restate what's already here.)*
   `IsoDate` args. Weeks are **Monday-start calendar weeks** (matching History), months are
   calendar months.
 - **Demo rows are identified by an `id` prefix of `demo-`**, not by a schema field or a
-  localStorage id list; clearing demo data deletes only `demo-*` rows.
+  localStorage id list; clearing demo data deletes only `demo-*` rows. *(F2 retires demo mode;
+  the prefix then only marks rows the migration skips.)*
 - **Cross-midnight activities are stored as two per-day rows** sharing `spanId` (= the head row's
   `id`; the tail row's id is `${headId}-next`). `startMinutes` is 0-1439; `endMinutes` is
   end-exclusive 1-1440, where 1440 means "ends at midnight". Edit and delete always act on the
@@ -92,9 +94,20 @@ planning. Keep entries terse; don't restate what's already here.)*
   `architecture/ADR-007-firebase.md`; per-user data then lives under the `users/{uid}/…` path, with no
   `profileId` field. The Dexie rules above (additive `.version()`, `fake-indexeddb` integration
   test) also retire with F2; see `plans/2026-10-01-firebase-setup.html`.)*
-- **Firestore era (F2+):** Firestore access lives only in `src/lib/firebase.ts` + `use-*` hooks;
-  docs keep today's ids/fields; multi-row writes (spans, migration) use `writeBatch` (≤500 ops).
-  Security Rules changes ship with a `@firebase/rules-unit-testing` test on the emulator.
+- **Firestore era (F2+):** Firestore access lives only in `src/lib/firebase.ts`,
+  `firestore-paths.ts`, `*-writes.ts`, `user-profile.ts`, `migrate-local-data.ts` and `use-*`
+  hooks; write functions take a `UserScope` (`{ db, uid }`). Docs keep today's ids/fields (`id`
+  field = doc id, ms numbers for timestamps, `ignoreUndefinedProperties`); multi-row writes (spans,
+  migration) use `writeBatch` (≤500 ops). Security Rules changes ship with a
+  `@firebase/rules-unit-testing` test on the emulator; rules field limits mirror `build*`
+  validation.
+- **Firestore UI writes are fire-and-forget:** never `await` a `commit()`/`setDoc` in a UI path
+  (offline it resolves only on server ack) — wrap it in `trackWrite()` so `useSyncStatus` sees it;
+  only the migration awaits commits. Queries filter on one field and sort client-side (no
+  composite indexes). `DEFAULT_CATEGORIES` live in code and are merged by `useCategories`; only
+  custom categories are stored. Emulator-only test hooks (`window.__sdtTest`) sit behind
+  `NEXT_PUBLIC_FIREBASE_EMULATORS === '1'` and must not appear in `out/`. See
+  `plans/2026-10-01-v2-roadmap-cross-midnight.html` §2.
 - **No real Firebase credentials in tests:** emulators run with a `demo-*` project id
   (`demo-sdt`), the AI client is injected and mocked; only deploy jobs use the
   `FIREBASE_SERVICE_ACCOUNT_*` secret. The web `firebaseConfig` is public and committed; never

@@ -16,6 +16,9 @@
   code { background: #f4f4f5; padding: .1rem .35rem; border-radius: 4px; font-size: .85em; }
   .risk-low { color: #16a34a; font-weight: 600; }
   .risk-med { color: #d97706; font-weight: 600; }
+  .risk-high { color: #dc2626; font-weight: 600; }
+  pre { background: #f4f4f5; border-radius: 8px; padding: .7rem .9rem; font-size: .78rem; line-height: 1.45; overflow-x: auto; }
+  .user { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: .75rem 1rem; font-size: .88rem; margin-top: .75rem; }
   ul.checklist { list-style: none; padding-left: 0; margin-top: .75rem; }
   ul.checklist li { padding: .35rem 0; }
   ul.checklist li::before { content: "☐  "; color: #a1a1aa; }
@@ -58,7 +61,7 @@
 <body>
 
 <h1>Plan: Student Day Tracker v2 — Tạo account + đăng nhập</h1>
-<p class="meta"><strong>Status: Slice 1 shipped 2026-10-03</strong> (PR #2) · F1 Hosting shipped 2026-10-03 (PR #1) · <strong>next: §1 Frontend + §2 Backend = Tạo account + đăng nhập (F2)</strong> — mockups in §1.2 awaiting owner review</p>
+<p class="meta"><strong>Status: Slice 1 shipped 2026-10-03</strong> (PR #2) · F1 Hosting shipped 2026-10-03 (PR #1) · <strong>next: §1 Frontend + §2 Backend = Tạo account + đăng nhập (F2)</strong> — mockups ①–⑧ in §1.2 <strong>approved by the owner 2026-10-03</strong> · detailed for implementation 2026-10-03</p>
 <p class="meta">2026-10-01, restructured 2026-10-03 to the plan template in <code>CLAUDE.md</code> · source: <code>requirement/Requirement.txt</code> (“Tạo User và đăng nhập.”) · summary: <code>docs/REQUIREMENTS.md</code> §4 · architecture: <code>architecture/ADR-007-firebase.md</code> · Firebase console steps U1–U9 + F1–F3: <code>plans/2026-10-01-firebase-setup.html</code> · supersedes D5 of <code>plans/2026-09-26-add-activity.html</code></p>
 
 <!-- ============================================================ -->
@@ -130,27 +133,29 @@ them. F3 follows slice 4 because rule-based comments are its offline/over-quota 
 <h2>1. Frontend — Tạo account + đăng nhập</h2>
 
 <h3>1.1 Scope</h3>
-<p>Build the screens a student sees to create an account and sign in with Google, and the account controls inside the app. The designs in §1.2 are the target the implementer must match.</p>
+<p>Build the screens a student sees to create an account and sign in with Google, and the account controls inside the app. The approved designs ①–⑧ in §1.2 are the target the implementer must match.</p>
 <p><strong>Trong scope:</strong></p>
 <ul class="scope-list">
-  <li><strong>Sign-in screen</strong> (desktop split layout, mobile single column): value statement + <code>Sign in with Google</code> + privacy line</li>
-  <li><strong>Offline state</strong> of the sign-in screen: amber notice, button disabled</li>
-  <li><strong>First-sign-in migration dialog</strong>: progress bar over the blurred app while local data moves to the account</li>
-  <li><strong>Account block</strong> at the bottom of the desktop sidebar (avatar, name, email) with a popover menu: sync status, Privacy notice, Sign out</li>
-  <li><strong>Mobile</strong>: avatar button in the header (replaces the theme toggle) opening a bottom sheet: name/email, sync status, Dark mode, Privacy notice, Sign out</li>
-  <li>Greeting “Good morning, &lt;given name&gt;” from the Google profile</li>
-  <li>Privacy notice page (<code>/privacy</code>), Vietnamese text</li>
+  <li><strong>Auth gate</strong> (<code>auth-gate.tsx</code>, client): skeleton while Firebase restores the session (no flash of ①), sign-in screen when signed out, app shell when signed in. <code>/privacy/</code> is reachable signed out.</li>
+  <li><strong>Sign-in screen</strong> ①② (desktop split, mobile single column): value statement + <code>Sign in with Google</code> + privacy line; <strong>offline state</strong> ③ (amber notice, button disabled)</li>
+  <li><strong>First-sign-in migration dialog</strong> ④: progress bar over the blurred app; failure text says it retries next start and keeps local data</li>
+  <li><strong>Account block</strong> ⑤⑥ at the bottom of the desktop sidebar (avatar initial, name, email) + popover: sync status, Privacy notice, Sign out</li>
+  <li><strong>Mobile</strong> ⑦⑧: avatar button in the Home header replaces the theme toggle (below <code>sm</code>) and opens a bottom sheet: name/email, sync status, Dark mode, Privacy notice, Sign out</li>
+  <li>Sign out while offline with unsynced changes → <code>ConfirmDialog</code> warning before the cache is cleared</li>
+  <li>Greeting “Good morning, &lt;given name&gt;”; <strong>demo mode retired</strong> (no demo seed/banner — a new account starts empty, as in ⑤)</li>
+  <li>Privacy notice page <code>/privacy</code>, Vietnamese text</li>
 </ul>
 <p><strong>Ngoài scope (explicit):</strong></p>
 <ul class="scope-list">
   <li>Email/password sign-up form, forgot password, phone sign-in (Google only — D-A′)</li>
-  <li>Onboarding questionnaire screens (slice 2), parent view (slice 8)</li>
-  <li>Profile editing (name/photo come from Google)</li>
+  <li>Onboarding questionnaire screens (slice 2, D-B), parent view (slice 8)</li>
+  <li>Profile editing; Google profile photo (avatar shows the initial, as in the mockups)</li>
+  <li>Account menu on History/Insights headers on mobile (Home only, as in ⑦)</li>
 </ul>
 
 <h3>1.2 Structure of UI</h3>
 <p>Designed for this plan and rendered from the live app (real fonts, colors and layout at https://student-day-tracker.web.app) with the new elements added, so what you review is what will ship. Sample user: <em>Minh Anh</em>.</p>
-<div class="review"><strong>Owner review:</strong> please check copy, layout and placement before §2 starts. Comment by screen number (e.g. “③ đổi chữ …”). Approved designs become the acceptance reference in §2.7.</div>
+<div class="review"><strong>Approved by the owner (2026-10-03):</strong> ①–⑧ are the acceptance reference for §2.7. A change after this needs a new numbered figure and a new approval.</div>
 <h4>Sitemap / cấu trúc tổng thể (v2)</h4>
 <div class="diagram">
   <svg viewBox="0 0 780 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="v2 sitemap: sign-in gate, first-run migration and onboarding, then Home, History, Insights, with an account menu">
@@ -221,79 +226,99 @@ them. F3 follows slice 4 because rule-based comments are its offline/over-quota 
 <table>
   <tr><th>Requirement</th><th>Screen</th><th>Component (planned)</th><th>Status</th></tr>
   <tr><td>“Tạo User” (first sign-in creates account)</td><td>① ② ④</td><td><code>src/components/sign-in-screen.tsx</code>, <code>migration-dialog.tsx</code></td><td>Planned</td></tr>
-  <tr><td>“đăng nhập”</td><td>① ② ③</td><td><code>sign-in-screen.tsx</code> + auth gate in <code>src/app/layout.tsx</code></td><td>Planned</td></tr>
-  <tr><td>Signed-in identity, sign out</td><td>⑤ ⑥ ⑦ ⑧</td><td><code>src/components/account-menu.tsx</code> (sidebar popover + mobile sheet), <code>sidebar-nav.tsx</code>, Home header</td><td>Planned</td></tr>
+  <tr><td>“đăng nhập”</td><td>① ② ③</td><td><code>sign-in-screen.tsx</code> + <code>src/components/auth-gate.tsx</code> (wrapped around the shell in <code>src/app/layout.tsx</code>, which stays a server component for <code>metadata</code>)</td><td>Planned</td></tr>
+  <tr><td>Signed-in identity, sync status, sign out</td><td>⑤ ⑥ ⑦ ⑧</td><td><code>src/components/account-menu.tsx</code> (sidebar popover + mobile sheet), <code>sidebar-nav.tsx</code>, <code>theme-toggle.tsx</code>, Home header in <code>src/app/page.tsx</code></td><td>Planned</td></tr>
   <tr><td>Privacy (Nghị định 13/2023)</td><td>① ⑥ ⑧</td><td><code>src/app/privacy/page.tsx</code></td><td>Planned</td></tr>
 </table>
 
 <h3>1.3 Task</h3>
 <table>
   <tr><th>Phase</th><th>Step</th><th>File(s)</th><th>Depends on</th><th>Risk</th></tr>
-  <tr><td>1</td><td>Sign-in screen ①②③ (responsive, offline state from <code>navigator.onLine</code> + events), Google G mark inline SVG.</td><td><code>src/components/sign-in-screen.tsx</code></td><td>—</td><td class="risk-low">Low</td></tr>
-  <tr><td>1</td><td>Auth gate: render ① until <code>use-auth</code> reports a user; skeleton while resolving (no flash of ①).</td><td><code>src/app/layout.tsx</code> (client gate component)</td><td>§2 <code>use-auth</code></td><td class="risk-med">Med</td></tr>
-  <tr><td>1</td><td>Migration dialog ④ (focus-trapped, <code>role="dialog"</code>, progress from the migration callback).</td><td><code>src/components/migration-dialog.tsx</code></td><td>§2 migration</td><td class="risk-med">Med</td></tr>
-  <tr><td>2</td><td>Account block + popover ⑤⑥ in the sidebar; avatar button + bottom sheet ⑦⑧ on mobile; theme toggle moves into the sheet on mobile.</td><td><code>src/components/account-menu.tsx</code>, <code>sidebar-nav.tsx</code>, <code>theme-toggle.tsx</code>, <code>src/app/page.tsx</code></td><td>Phase 1</td><td class="risk-med">Med</td></tr>
-  <tr><td>2</td><td>Greeting with given name (last word of the display name, fallback: email local part).</td><td><code>src/app/page.tsx</code>, pure helper <code>src/lib/get-given-name.ts</code> + test</td><td>—</td><td class="risk-low">Low</td></tr>
-  <tr><td>3</td><td><code>/privacy</code> page (Vietnamese), linked from ① ⑥ ⑧.</td><td><code>src/app/privacy/page.tsx</code></td><td>Q1 in §2.2</td><td class="risk-low">Low</td></tr>
-  <tr><td>3</td><td>Design tokens only (<code>--surface</code>, <code>--border</code>…) — the mockups' inline colors map to existing tokens/Tailwind zinc + indigo; dark mode for every new element.</td><td>all of the above</td><td>—</td><td class="risk-low">Low</td></tr>
+  <tr><td>1</td><td>Sign-in screen ①②③: <code>&lt;h1&gt;Welcome&lt;/h1&gt;</code>, one <code>Sign in with Google</code> button (inline SVG G mark) → <code>signInWithGoogle()</code>; offline state from <code>useOnlineStatus()</code>; <code>auth/popup-closed-by-user</code> ignored, other errors inline (<code>role="alert"</code>).</td><td><code>src/components/sign-in-screen.tsx</code>, <code>src/lib/use-online-status.ts</code></td><td>§2 <code>use-auth</code></td><td class="risk-low">Low</td></tr>
+  <tr><td>1</td><td>Auth gate: <code>loading</code> → full-page skeleton; <code>signed-out</code> → ① only (no sidebar / bottom nav) except <code>/privacy/</code>; <code>signed-in</code> → run <code>ensureUserProfile</code> then <code>migrateLocalData</code> once per session, then the existing shell (<code>SidebarNav</code> + children + <code>NavBar</code>).</td><td><code>src/components/auth-gate.tsx</code>, <code>src/app/layout.tsx</code></td><td>§2 phase 2</td><td class="risk-med">Med</td></tr>
+  <tr><td>1</td><td>Migration dialog ④: <code>role="dialog"</code> + <code>aria-modal</code> + <code>aria-labelledby</code>, focus-trapped, <code>&lt;progress value={done} max={total}&gt;</code>; shown only when the migration plan has ≥ 1 op; failure state with Close.</td><td><code>src/components/migration-dialog.tsx</code></td><td>§2 migration</td><td class="risk-med">Med</td></tr>
+  <tr><td>2</td><td>Account block + popover ⑤⑥ pinned to the sidebar bottom (<code>mt-auto</code>; button <code>aria-haspopup</code>/<code>aria-expanded</code>, Esc closes, focus returns). Mobile ⑦⑧: avatar button <code>sm:hidden</code> in the Home header, <code>ThemeToggle</code> becomes <code>hidden sm:flex</code> there and a “Dark mode” switch variant lives in the sheet. Sync status text from <code>useSyncStatus()</code>.</td><td><code>src/components/account-menu.tsx</code>, <code>sidebar-nav.tsx</code>, <code>theme-toggle.tsx</code>, <code>src/app/page.tsx</code></td><td>Phase 1</td><td class="risk-med">Med</td></tr>
+  <tr><td>2</td><td>Sign out: online → <code>signOutAndClear()</code>; offline with pending writes → <code>ConfirmDialog</code> (“Some changes haven't synced and will be lost”) first.</td><td><code>account-menu.tsx</code>, <code>confirm-dialog.tsx</code> (reuse)</td><td>§2 <code>use-auth</code>, <code>use-sync-status</code></td><td class="risk-med">Med</td></tr>
+  <tr><td>2</td><td>Greeting “Good morning, Anh” via <code>getGivenName</code>; empty name → greeting without a name.</td><td><code>src/app/page.tsx</code>, <code>src/lib/get-given-name.ts</code> + test</td><td>—</td><td class="risk-low">Low</td></tr>
+  <tr><td>2</td><td>Retire demo mode: drop <code>useDemoData</code>/<code>DemoBanner</code> from Home, History, Insights; delete <code>use-demo-data.ts</code>, <code>demo-banner.tsx</code>. Keep <code>demo-activities.ts</code> (e2e fixture + <code>isDemoActivity</code> for migration).</td><td><code>src/app/page.tsx</code>, <code>history/page.tsx</code>, <code>insights/page.tsx</code></td><td>§2 Q9</td><td class="risk-low">Low</td></tr>
+  <tr><td>3</td><td><code>/privacy</code> page (Vietnamese; who, what is stored, <code>asia-southeast1</code>, how to delete — by request until Q2's follow-up), linked from ① ⑥ ⑧.</td><td><code>src/app/privacy/page.tsx</code></td><td>Q1</td><td class="risk-low">Low</td></tr>
+  <tr><td>3</td><td>Design tokens only (<code>--surface</code>, <code>--border</code>…, zinc/indigo as today); dark mode for every new element; 44 px touch targets on mobile.</td><td>all of the above</td><td>—</td><td class="risk-low">Low</td></tr>
 </table>
 
 <!-- ============================================================ -->
 <h2>2. Backend — Tạo account + đăng nhập (F2)</h2>
-<p class="meta">Implementation detail, console steps and emulator setup: F2 in <code>plans/2026-10-01-firebase-setup.html</code> · console prerequisites U2–U6 done 2026-10-02/03 · JDK 21 installed</p>
+<p class="meta">Supersedes the F2 sketch in <code>plans/2026-10-01-firebase-setup.html</code> where they differ · console prerequisites U2–U6 done 2026-10-02/03 · JDK 21 installed locally · Firebase project <code>student-day-tracker</code>, tests use <code>demo-sdt</code></p>
 
 <h3>2.1 Scope</h3>
-<p>A student signs in with Google; the first sign-in creates the account. Data then lives in Firestore under <code>users/{uid}</code>, syncs across devices and works offline.</p>
+<p>A student signs in with Google; the first sign-in creates the account. Data then lives in Firestore under <code>users/{uid}</code>, syncs across devices and works offline. Pure helpers (<code>build*</code>, <code>get-*</code>, Insights) are unchanged; only the data layer, hooks and writes change.</p>
 <p><strong>Trong scope:</strong></p>
 <ul class="scope-list">
-  <li>Firebase Auth (Google provider) + <code>use-auth</code> hook; profile document <code>users/{uid}</code> (<code>displayName</code>, <code>email</code>, <code>photoURL</code>, <code>createdAt</code>, <code>privacyAcceptedAt</code>)</li>
-  <li>Firestore with persistent offline cache replacing Dexie as the source of truth; <code>use-*</code> hooks rewritten; pure helpers unchanged</li>
-  <li>One-time migration of local Dexie rows (incl. <code>spanId</code> pairs) — chunks ≤ 500 writes, repeat-safe, marker written last</li>
-  <li>Sign out clears the local Firestore cache</li>
-  <li>Security Rules (<code>users/{uid}/**</code> only) + rules tests on the emulator</li>
+  <li>Firebase Auth (Google provider only) + <code>use-auth</code>; profile document <code>users/{uid}</code> created on first sign-in</li>
+  <li>Firestore (<code>persistentLocalCache</code> + multi-tab) replaces Dexie as source of truth; <code>use-*</code> hooks keep their names/return shapes, writes take a <code>UserScope</code></li>
+  <li>One-time Dexie → Firestore migration (custom categories + non-demo activities incl. <code>spanId</code> pairs) — batches ≤ 500, repeat-safe, markers written last; Dexie stays read-only (frozen at <code>version(2)</code>)</li>
+  <li>Sign out clears the local Firestore cache; Security Rules + rules tests; Auth/Firestore emulators for dev, integration and e2e; CI runs the emulator tests (Java 21)</li>
+  <li>Service worker stops intercepting Firebase traffic</li>
 </ul>
 <p><strong>Ngoài scope (explicit):</strong></p>
 <ul class="scope-list">
-  <li>Email/password, SMS, anonymous/guest mode</li>
-  <li>Account deletion (follow-up, see §2.2 Q2), parent sharing</li>
-  <li>App Check enforcement and AI (F3)</li>
+  <li>Email/password, SMS, anonymous/guest mode; account deletion (Q2); parent sharing</li>
+  <li><strong>App Check</strong> wiring (<code>ReCaptchaEnterpriseProvider</code>, site key <code>6LfvG9stAAAAAJ5N4S63oaDKwUsVCZtNdn0bC0lc</code>, not enforced) and AI — both F3</li>
+  <li>New default categories / goal mapping (D-B = (iii), slice 2)</li>
 </ul>
+
+<h4>Fixed facts (public, commit as-is)</h4>
+<pre>// src/lib/firebase-config.ts — public web config (not a secret)
+export const firebaseConfig = {
+  apiKey: 'AIzaSyAyyuuezgfY5b1tB8Oo0yog83TP5z1EU7A',
+  authDomain: 'student-day-tracker.firebaseapp.com',
+  projectId: 'student-day-tracker',
+  storageBucket: 'student-day-tracker.firebasestorage.app',
+  messagingSenderId: '203051636156',
+  appId: '1:203051636156:web:3ea7820a2a8098dd0947b9',
+};</pre>
+<p class="cap">Console state: Google provider only (Email/Password off); authorized domains <code>localhost</code>, <code>student-day-tracker.web.app</code>, <code>student-day-tracker.firebaseapp.com</code>; Firestore Standard <code>(default)</code> in <code>asia-southeast1</code>, production mode (deny-all until rules are deployed — see U10).</p>
 
 <h3>2.2 Defaults (tạm chốt)</h3>
 <table>
-  <tr><th>#</th><th>Question</th><th>Default</th><th>Grounding</th></tr>
-  <tr><td>Q1</td><td>Who writes the privacy notice?</td><td>Planner drafts it in Vietnamese; owner reviews before merge.</td><td>Nghị định 13/2023; users are minors; data in <code>asia-southeast1</code></td></tr>
-  <tr><td>Q2</td><td>In-app account deletion?</td><td>Not in this slice; follow-up deletes <code>users/{uid}/**</code> then <code>user.delete()</code>.</td><td>Keeps F2 small; deletion needs recent sign-in handling</td></tr>
-  <tr><td>Q3</td><td>Popup or redirect?</td><td>Popup on desktop, redirect on mobile / installed PWA.</td><td>Popups are blocked or awkward in standalone PWAs</td></tr>
-  <tr><td>Q4</td><td>Migrate demo rows?</td><td>No — only real local rows (<code>demo-*</code> skipped).</td><td>D7 demo-prefix rule in <code>CLAUDE.md</code></td></tr>
-  <tr><td>Q5</td><td>Greeting name?</td><td>Last word of the Google display name (Vietnamese given name), fallback email local part.</td><td>Mockups ⑤ ⑦</td></tr>
-  <tr><td>Q6</td><td>Shared device on sign out?</td><td>Clear Firestore cache (<code>terminate</code> + <code>clearIndexedDbPersistence</code>) and reload to ①.</td><td>Privacy of minors on family devices</td></tr>
+  <tr><th>#</th><th>Question</th><th>Default (tạm chốt)</th><th>Grounding</th></tr>
+  <tr><td>Q1</td><td>Who writes the privacy notice?</td><td>Planner/implementer drafts it in Vietnamese; owner reviews before merge.</td><td>Nghị định 13/2023; users are minors; data in <code>asia-southeast1</code></td></tr>
+  <tr><td>Q2</td><td>In-app account deletion?</td><td>Not in this slice; follow-up deletes <code>users/{uid}/**</code> then <code>user.delete()</code>.</td><td>Keeps F2 small; deletion needs recent-sign-in handling</td></tr>
+  <tr><td>Q3</td><td>Popup or redirect?</td><td><strong>Changed:</strong> <code>signInWithPopup</code> everywhere; fall back to <code>signInWithRedirect</code> only on <code>auth/popup-blocked</code> / <code>auth/operation-not-supported-in-this-environment</code>. <code>authDomain</code> stays <code>student-day-tracker.firebaseapp.com</code>.</td><td>Redirect with an <code>authDomain</code> different from the serving domain (<code>web.app</code>) breaks under third-party-storage partitioning (Chrome/Safari/Firefox); Firebase's documented fix is popup, or serving <code>authDomain</code> from the app's domain (extra OAuth redirect-URI step — only if the fallback proves needed)</td></tr>
+  <tr><td>Q4</td><td>Migrate demo rows?</td><td>No — <code>demo-*</code> activities and default categories are skipped.</td><td>Demo-prefix rule in <code>CLAUDE.md</code></td></tr>
+  <tr><td>Q5</td><td>Greeting name?</td><td>Last word of the Google display name, fallback email local part, else no name.</td><td>Mockups ⑤ ⑦</td></tr>
+  <tr><td>Q6</td><td>Shared device on sign out?</td><td>Online: <code>waitForPendingWrites</code> (≤ 5 s) → <code>signOut</code> → <code>terminate</code> → <code>clearIndexedDbPersistence</code> → <code>location.assign('/')</code>. Offline with pending writes: confirm first.</td><td>Privacy of minors on family devices; cleared cache can't sync later</td></tr>
+  <tr><td>Q7</td><td>How are default categories seeded per user?</td><td><strong>Not stored.</strong> <code>DEFAULT_CATEGORIES</code> stay in code; <code>useCategories</code> returns defaults + the user's stored custom categories (sorted by <code>createdAt</code>, defaults are 0–3). Only <code>isDefault: false</code> docs exist.</td><td>Zero writes at sign-up; slice 2 (D-B) adds Sleep/School/… as code constants without a per-user backfill; simpler rules</td></tr>
+  <tr><td>Q8</td><td>Which account gets this device's local Dexie data?</td><td>The <strong>first account that signs in on the device</strong>. Device marker <code>localStorage['sdt-dexie-migrated']</code> = <code>{uid, at}</code>; later accounts on that device skip migration.</td><td>Local data had no owner; avoids copying a sibling's data into a second account</td></tr>
+  <tr><td>Q9</td><td>Demo mode after sign-in is required?</td><td>Retired: a new account starts empty (⑤ has no demo banner). <code>buildDemoActivities</code> is kept as an e2e fixture.</td><td>Mockup ⑤ caption; every user now has a real account</td></tr>
+  <tr><td>Q10</td><td>Timestamps in Firestore?</td><td>Plain numbers (ms) as today (<code>createdAt</code>, <code>privacyAcceptedAt</code>, <code>migratedFromDexieAt</code>), not <code>Timestamp</code>/<code>serverTimestamp</code>.</td><td>Types and pure helpers unchanged; rules check <code>is number</code></td></tr>
+  <tr><td>Q11</td><td>Who deploys <code>firestore.rules</code>, when?</td><td><strong>The user</strong>, via CLI, after tester SHIP and <em>before</em> merging F2 (U10). CI does not deploy rules.</td><td>The <code>init hosting:github</code> service account has Hosting admin only; DB is deny-all, so merging first ships a live app that can't read/write</td></tr>
+  <tr><td>Q12</td><td>Which tests run in CI?</td><td>CI adds <code>pnpm test:emulator</code> (rules + Firestore integration, Java 21). Playwright e2e stays a local/tester gate, as today.</td><td>Current workflows run typecheck/check/test/build only</td></tr>
 </table>
 
 <h3>2.3 Requirements</h3>
 <table>
   <tr><th>Section</th><th>User-visible behavior</th><th>Acceptance check</th></tr>
-  <tr><td>Req.txt “Tạo User”</td><td>First <code>Sign in with Google</code> creates the account and its profile document; no sign-up form exists.</td><td>Emulator: new user → <code>users/{uid}</code> exists with name, email, <code>createdAt</code>.</td></tr>
-  <tr><td>Req.txt “đăng nhập”</td><td>Signed-out visitors see only the sign-in screen; Home/History/Insights require a session.</td><td>e2e: fresh context → sign-in screen; after emulator sign-in → Home.</td></tr>
-  <tr><td>Offline-first (ADR-007)</td><td>After the first sign-in, the app opens and logs activities offline; writes sync when back online.</td><td>e2e: sign in, go offline, add activity, reload → still there; back online → present on server.</td></tr>
-  <tr><td>Migration</td><td>Existing local activities and custom categories appear in the account after the first sign-in on that device; runs once.</td><td>Integration: 600 rows migrate in 2 batches; re-running is a no-op.</td></tr>
-  <tr><td>Multi-device</td><td>Signing in on a second device shows the same data.</td><td>Emulator: two clients, same uid, same rows.</td></tr>
-  <tr><td>Sign out</td><td>Returns to the sign-in screen and clears the local cache.</td><td>e2e: sign out → sign-in screen; reload → no activity rows readable.</td></tr>
-  <tr><td>Privacy (Nghị định 13/2023)</td><td>Sign-in screen links a privacy notice; acceptance time is stored.</td><td><code>privacyAcceptedAt</code> set on first sign-in.</td></tr>
-  <tr><td>Security</td><td>One user can never read another user's data.</td><td>Rules tests: user A reading <code>users/B/**</code> is denied.</td></tr>
+  <tr><td>Req.txt “Tạo User”</td><td>First <code>Sign in with Google</code> creates the account and its profile document; no sign-up form exists.</td><td>e2e (Auth emulator popup): new user → <code>users/{uid}</code> has <code>displayName</code>, <code>email</code>, <code>createdAt</code>, <code>privacyAcceptedAt</code>.</td></tr>
+  <tr><td>Req.txt “đăng nhập”</td><td>Signed-out visitors see only ① on every route (except <code>/privacy/</code>); a persisted session opens straight into the app.</td><td>e2e: fresh context on <code>/</code>, <code>/history/</code>, <code>/insights/</code> → heading “Welcome”; after sign-in + reload → Home without ①.</td></tr>
+  <tr><td>Offline-first (ADR-007)</td><td>After the first sign-in, adding/editing/deleting works offline and the form closes immediately; changes sync when back online.</td><td>e2e: <code>context.setOffline(true)</code> → add → row on timeline + form closed; online → doc on emulator within 10 s.</td></tr>
+  <tr><td>Migration</td><td>Local activities (incl. cross-midnight pairs) and custom categories appear in the account after the first sign-in on that device, with ④; runs once.</td><td>Integration: 600 local rows → 2 batches, pair never split, demo/defaults skipped, re-run writes 0. e2e: seeded Dexie → ④ → rows on Home.</td></tr>
+  <tr><td>Multi-device</td><td>Signing in on a second device shows the same data.</td><td>Integration: two app instances, same uid, write on one → <code>onSnapshot</code> on the other.</td></tr>
+  <tr><td>Sign out</td><td>Returns to ① and clears this device's cache; warns first if offline with unsynced changes.</td><td>e2e: sign out → ①; Firestore IndexedDB gone; signing in as another user shows none of the first user's rows.</td></tr>
+  <tr><td>Privacy (Nghị định 13/2023)</td><td>① links the notice; acceptance time is stored.</td><td><code>privacyAcceptedAt</code> = <code>createdAt</code> on first sign-in.</td></tr>
+  <tr><td>Security</td><td>One user can never read or write another user's data; malformed docs are rejected.</td><td>Rules tests (see 2.6).</td></tr>
 </table>
 
-
 <h3>2.4 Flow</h3>
+<h4>Sign-in and first run</h4>
 <div class="diagram">
   <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Login flow: open app, signed in check, online check, Google sign-in, first sign-in creates profile and migrates local data, then the app">
     <defs><marker id="la" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#71717a" /></marker></defs>
     <rect x="5" y="20" width="100" height="40" rx="20" fill="#f4f4f5" stroke="#a1a1aa"/><text x="55" y="44" text-anchor="middle">Open app</text>
     <rect x="135" y="15" width="110" height="50" rx="8" fill="#fff" stroke="#a1a1aa"/><text x="190" y="36" text-anchor="middle">Signed in?</text><text x="190" y="52" text-anchor="middle" class="lbl">onAuthStateChanged</text>
-    <rect x="135" y="110" width="110" height="50" rx="8" fill="#fff" stroke="#a1a1aa"/><text x="190" y="131" text-anchor="middle">Online?</text><text x="190" y="147" text-anchor="middle" class="lbl">no → “connect…”</text>
-    <rect x="275" y="110" width="130" height="50" rx="8" fill="#dbeafe" stroke="#2563eb"/><text x="340" y="131" text-anchor="middle">Sign in with Google</text><text x="340" y="147" text-anchor="middle" class="lbl">popup / redirect</text>
-    <rect x="435" y="110" width="130" height="50" rx="8" fill="#fff" stroke="#a1a1aa"/><text x="500" y="131" text-anchor="middle">users/{uid} exists?</text><text x="500" y="147" text-anchor="middle" class="lbl">first sign-in?</text>
-    <rect x="435" y="195" width="300" height="45" rx="8" fill="#dbeafe" stroke="#2563eb"/><text x="585" y="214" text-anchor="middle">Tạo account: write profile → migrate Dexie</text><text x="585" y="230" text-anchor="middle" class="lbl">chunks ≤ 500 · marker last · then onboarding (slice 2)</text>
+    <rect x="135" y="110" width="110" height="50" rx="8" fill="#fff" stroke="#a1a1aa"/><text x="190" y="131" text-anchor="middle">Online?</text><text x="190" y="147" text-anchor="middle" class="lbl">no → ③</text>
+    <rect x="275" y="110" width="130" height="50" rx="8" fill="#dbeafe" stroke="#2563eb"/><text x="340" y="131" text-anchor="middle">Sign in with Google</text><text x="340" y="147" text-anchor="middle" class="lbl">popup (redirect fallback)</text>
+    <rect x="435" y="110" width="130" height="50" rx="8" fill="#fff" stroke="#a1a1aa"/><text x="500" y="131" text-anchor="middle">ensureUserProfile</text><text x="500" y="147" text-anchor="middle" class="lbl">create users/{uid} if missing</text>
+    <rect x="435" y="195" width="300" height="45" rx="8" fill="#dbeafe" stroke="#2563eb"/><text x="585" y="214" text-anchor="middle">migrateLocalData (device marker unset?) → ④</text><text x="585" y="230" text-anchor="middle" class="lbl">batches ≤ 500 · profile marker, then device marker</text>
     <rect x="600" y="15" width="150" height="50" rx="8" fill="#dcfce7" stroke="#16a34a"/><text x="675" y="36" text-anchor="middle">App (Home…)</text><text x="675" y="52" text-anchor="middle" class="lbl">Firestore offline cache</text>
     <g stroke="#71717a" stroke-width="1.3" fill="none" marker-end="url(#la)">
       <line x1="105" y1="40" x2="133" y2="40"/>
@@ -301,49 +326,131 @@ them. F3 follows slice 4 because rule-based comments are its offline/over-quota 
       <line x1="190" y1="65" x2="190" y2="108"/>
       <line x1="245" y1="135" x2="273" y2="135"/>
       <line x1="405" y1="135" x2="433" y2="135"/>
-      <line x1="565" y1="135" x2="660" y2="67"/>
       <line x1="500" y1="160" x2="500" y2="193"/>
       <line x1="735" y1="215" x2="745" y2="67"/>
     </g>
-    <text x="420" y="34" class="lbl">yes</text><text x="196" y="90" class="lbl">no</text><text x="600" y="100" class="lbl">yes</text><text x="506" y="182" class="lbl">no</text>
+    <text x="420" y="34" class="lbl">yes (gate also runs ensure + migrate)</text><text x="196" y="90" class="lbl">no</text>
   </svg>
 </div>
 
+<h4>Layers and data model</h4>
+<div class="diagram">
+  <svg viewBox="0 0 760 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Layers: pages call hooks and write modules, which use firebase.ts; firebase.ts talks to Firestore or the emulators; Dexie is read only by the migration">
+    <defs><marker id="lb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#71717a" /></marker></defs>
+    <rect x="10" y="15" width="170" height="70" rx="8" fill="#eef2ff" stroke="#818cf8"/><text x="95" y="38" text-anchor="middle" font-weight="700">Pages / components</text><text x="95" y="56" text-anchor="middle" class="lbl">auth-gate · sign-in · account-menu</text><text x="95" y="71" text-anchor="middle" class="lbl">Home · History · Insights</text>
+    <rect x="210" y="15" width="170" height="70" rx="8" fill="#fff" stroke="#a1a1aa"/><text x="295" y="38" text-anchor="middle" font-weight="700">use-* hooks</text><text x="295" y="56" text-anchor="middle" class="lbl">use-auth · use-activities(-range)</text><text x="295" y="71" text-anchor="middle" class="lbl">use-categories · use-sync-status</text>
+    <rect x="410" y="15" width="160" height="70" rx="8" fill="#dbeafe" stroke="#2563eb"/><text x="490" y="38" text-anchor="middle" font-weight="700">firebase.ts</text><text x="490" y="56" text-anchor="middle" class="lbl">lazy getAuthClient / getDb</text><text x="490" y="71" text-anchor="middle" class="lbl">persistent cache · multi-tab</text>
+    <rect x="600" y="15" width="150" height="70" rx="8" fill="#dcfce7" stroke="#16a34a"/><text x="675" y="38" text-anchor="middle" font-weight="700">Firestore</text><text x="675" y="56" text-anchor="middle" class="lbl">users/{uid}</text><text x="675" y="71" text-anchor="middle" class="lbl">  /activities · /categories</text>
+    <rect x="10" y="130" width="170" height="70" rx="8" fill="#fff" stroke="#a1a1aa"/><text x="95" y="153" text-anchor="middle" font-weight="700">Pure helpers</text><text x="95" y="171" text-anchor="middle" class="lbl">build* · get-* · planDexieMigration</text><text x="95" y="186" text-anchor="middle" class="lbl">buildUserProfile · getGivenName</text>
+    <rect x="210" y="130" width="170" height="70" rx="8" fill="#fff" stroke="#a1a1aa"/><text x="295" y="153" text-anchor="middle" font-weight="700">Writes (UserScope)</text><text x="295" y="171" text-anchor="middle" class="lbl">activity-writes · category-writes</text><text x="295" y="186" text-anchor="middle" class="lbl">user-profile · migrate-local-data</text>
+    <rect x="410" y="130" width="160" height="70" rx="8" fill="#f4f4f5" stroke="#a1a1aa" stroke-dasharray="4 3"/><text x="490" y="153" text-anchor="middle" font-weight="700">Dexie (read-only)</text><text x="490" y="171" text-anchor="middle" class="lbl">db.ts frozen at version(2)</text><text x="490" y="186" text-anchor="middle" class="lbl">migration source only</text>
+    <rect x="600" y="130" width="150" height="70" rx="8" fill="#fafafa" stroke="#a1a1aa" stroke-dasharray="4 3"/><text x="675" y="153" text-anchor="middle" font-weight="700">Emulators</text><text x="675" y="171" text-anchor="middle" class="lbl">Auth 9099 · Firestore 8080</text><text x="675" y="186" text-anchor="middle" class="lbl">project demo-sdt</text>
+    <g stroke="#71717a" stroke-width="1.3" fill="none" marker-end="url(#lb)">
+      <line x1="180" y1="50" x2="208" y2="50"/>
+      <line x1="380" y1="50" x2="408" y2="50"/>
+      <line x1="570" y1="50" x2="598" y2="50"/>
+      <line x1="95" y1="85" x2="95" y2="128"/>
+      <line x1="170" y1="85" x2="240" y2="128"/>
+      <line x1="370" y1="130" x2="440" y2="87"/>
+      <line x1="410" y1="175" x2="382" y2="175"/>
+      <line x1="540" y1="85" x2="640" y2="128" stroke-dasharray="4 3"/>
+    </g>
+    <text x="582" y="112" class="lbl">EMULATORS=1</text>
+    <text x="10" y="222" class="lbl">Pages pass a UserScope {db, uid} from useAuth() to write functions; hooks read it themselves. Only migrate-local-data imports db.ts.</text>
+  </svg>
+</div>
+
+<table>
+  <tr><th>Path</th><th>Fields (exact)</th><th>Written by</th><th>Rules</th></tr>
+  <tr><td><code>users/{uid}</code></td><td><code>displayName</code>, <code>email</code>, <code>photoURL</code> (string | null), <code>createdAt</code>, <code>privacyAcceptedAt</code> (number ms), optional <code>migratedFromDexieAt</code> (number)</td><td><code>ensureUserProfile</code> (create once if <code>getDoc</code> misses); migration sets <code>migratedFromDexieAt</code> with <code>merge</code></td><td>owner only; key allowlist; update may change only <code>migratedFromDexieAt</code>, <code>displayName</code>, <code>photoURL</code>; no delete</td></tr>
+  <tr><td><code>users/{uid}/activities/{id}</code></td><td>Today's <code>Activity</code> unchanged: <code>id</code> (= doc id), <code>categoryId</code>, <code>name</code>, <code>date</code>, <code>startMinutes</code>, <code>endMinutes</code>, optional <code>spanId</code>, <code>createdAt</code>. Span = head <code>{uuid}</code> + tail <code>{uuid}-next</code>, both with <code>spanId</code> = head id</td><td><code>activity-writes.ts</code> (one <code>writeBatch</code> per add/edit/delete, both span rows together); migration</td><td>owner only; <code>id == docId</code>; <code>date</code> matches <code>^\d{4}-\d{2}-\d{2}$</code>; ints <code>0 ≤ start ≤ 1439</code>, <code>1 ≤ end ≤ 1440</code>, <code>start &lt; end</code>; <code>name</code> 1–200 chars; key allowlist</td></tr>
+  <tr><td><code>users/{uid}/categories/{id}</code></td><td>Custom <code>Category</code> only: <code>id</code>, <code>name</code>, <code>color</code>, <code>icon</code>, <code>isDefault: false</code>, <code>createdAt</code></td><td><code>category-writes.ts</code> (<code>addCategory</code>); migration</td><td>owner only; <code>isDefault == false</code>; <code>color</code> <code>^#[0-9a-fA-F]{6}$</code>; <code>name</code> 1–50 chars</td></tr>
+</table>
+<div class="note"><strong>Implementation notes that change what gets built.</strong>
+<ul class="scope-list">
+  <li><code>firebase.ts</code>: lazy singletons (never initialise at module top level — static export prerenders in Node). <code>initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }), ignoreUndefinedProperties: true })</code>; <code>memoryLocalCache()</code> when <code>typeof window === 'undefined'</code> (emulator tests in Node).</li>
+  <li>Emulators: when <code>NEXT_PUBLIC_FIREBASE_EMULATORS === '1'</code> <em>and</em> the host is <code>localhost</code>/<code>127.0.0.1</code> (or Node): <code>projectId: 'demo-sdt'</code>, <code>connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })</code>, <code>connectFirestoreEmulator(db, '127.0.0.1', 8080)</code>, and expose <code>window.__sdtTest = { signIn(uid, email, name), dexie }</code> (<code>signInWithCredential</code> + <code>GoogleAuthProvider.credential(JSON.stringify({ sub, email, email_verified: true, name }))</code>). The branch is dead code in production builds.</li>
+  <li>Never <code>await</code> a <code>commit()</code> in a UI path: offline it resolves only on server ack. Writes return after queuing; <code>trackWrite(promise)</code> feeds <code>useSyncStatus()</code> (<code>'synced' | 'pending' | 'offline' | 'error'</code>, module store + <code>useSyncExternalStore</code>). Builders still throw synchronously, so inline form errors keep working. Only migration awaits commits (online, 30 s timeout per batch).</li>
+  <li>Queries filter on one field and sort client-side: <code>where('date','==',d)</code> then sort by <code>startMinutes</code>; range = <code>where('date','&gt;=',s)</code> + <code>where('date','&lt;=',e)</code>; span lookup <code>where('spanId','==',id)</code>. No composite indexes, no <code>firestore.indexes.json</code>.</li>
+  <li><code>getActivityRows</code> reads <code>getDocsFromCache</code> first (works offline; rows are already subscribed), falling back to <code>getDocs</code>. Edit/delete use <code>writeBatch</code> (works offline), not <code>runTransaction</code>.</li>
+  <li><code>src/app/sw.ts</code>: prepend <code>{ matcher: ({ url }) =&gt; url.hostname.endsWith('googleapis.com') || url.pathname.startsWith('/__/'), handler: new NetworkOnly() }</code> before <code>defaultCache</code> — its cross-origin <code>NetworkFirst</code> rule would otherwise cache Firestore/Auth GETs.</li>
+</ul></div>
+<pre>// firestore.rules (sketch — tests in tests/rules/ are the spec)
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) { return request.auth != null &amp;&amp; request.auth.uid == uid; }
+    function str(v, max) { return v is string &amp;&amp; v.size() &gt;= 1 &amp;&amp; v.size() &lt;= max; }
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) &amp;&amp; validProfile(request.resource.data);
+      allow update: if isOwner(uid) &amp;&amp; validProfile(request.resource.data)
+        &amp;&amp; request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['migratedFromDexieAt', 'displayName', 'photoURL']);
+      match /activities/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) &amp;&amp; validActivity(id, request.resource.data);
+      }
+      match /categories/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) &amp;&amp; validCategory(id, request.resource.data);
+      }
+    }
+  }
+}</pre>
 
 <h3>2.5 Tasks</h3>
 <table>
   <tr><th>Phase</th><th>Step</th><th>File(s)</th><th>Depends on</th><th>Risk</th></tr>
-  <tr><td>1 Pure</td><td><code>buildUserProfile(authUser, now)</code>, <code>chunkForBatches(rows, 500)</code>, <code>getGivenName(displayName, email)</code>.</td><td><code>src/lib/build-user-profile.ts</code>, <code>chunk-for-batches.ts</code>, <code>get-given-name.ts</code> + tests</td><td>—</td><td class="risk-low">Low</td></tr>
-  <tr><td>2 Firebase</td><td><code>firebase.ts</code> (app, Auth, Firestore persistent cache, emulator wiring); <code>use-auth.ts</code>; Firestore-backed <code>use-*</code> hooks and writes.</td><td><code>src/lib/firebase.ts</code>, <code>use-auth.ts</code>, <code>use-*.ts</code>, <code>activity-writes.ts</code></td><td>Phase 1</td><td class="risk-med">Med</td></tr>
-  <tr><td>2 Firebase</td><td>First sign-in: profile write, Dexie → Firestore migration with progress callback, marker; sign-out cache clear.</td><td><code>src/lib/migrate-local-data.ts</code></td><td>above</td><td class="risk-med">Med</td></tr>
-  <tr><td>2 Firebase</td><td>Security Rules + rules tests (emulator, JDK 21).</td><td><code>firestore.rules</code>, <code>tests/rules/*.test.ts</code>, <code>firebase.json</code></td><td>—</td><td class="risk-med">Med</td></tr>
-  <tr><td>3 Wire</td><td>Connect §1 screens to auth/migration; remove Dexie from the read/write path (keep it only as migration source).</td><td><code>src/app/*</code>, <code>src/components/*</code></td><td>§1.3</td><td class="risk-med">Med</td></tr>
-  <tr><td>4 Docs</td><td>ARCHITECTURE (data layer = Firestore), <code>CLAUDE.md</code> tech stack + obsolete Dexie rules.</td><td><code>docs/ARCHITECTURE.md</code>, <code>CLAUDE.md</code></td><td>all</td><td class="risk-low">Low</td></tr>
+  <tr><td>0 Setup</td><td>Add <code>firebase</code>; dev <code>@firebase/rules-unit-testing</code>; remove <code>dexie-react-hooks</code> (keep <code>dexie</code>, <code>fake-indexeddb</code>). <code>firebase.json</code>: <code>"firestore": { "rules": "firestore.rules" }</code>, emulators <code>auth: 9099</code>, <code>firestore: 8080</code> next to the existing <code>hosting: 5002</code>. Scripts: <code>emulators</code> (<code>firebase emulators:start --only auth,firestore --project demo-sdt</code>), <code>dev:emu</code> (<code>NEXT_PUBLIC_FIREBASE_EMULATORS=1 next dev --webpack</code>), <code>test:emulator</code> (<code>firebase emulators:exec --only auth,firestore --project demo-sdt "vitest run -c vitest.emulator.config.ts"</code>).</td><td><code>package.json</code>, <code>firebase.json</code>, <code>vitest.emulator.config.ts</code> (node env, <code>tests/rules/**</code> + <code>tests/emulator/**</code>, <code>fileParallelism: false</code>, env flag set)</td><td>—</td><td class="risk-low">Low</td></tr>
+  <tr><td>1 Pure</td><td><code>buildUserProfile(user, now)</code>; <code>getGivenName(displayName, email)</code>; <code>planDexieMigration(local, remote, maxOps = 500)</code> → <code>{ categories, activities }[]</code> (categories first; skip defaults, <code>demo-*</code>, ids already remote; remap a local custom category to a remote one with the same case-insensitive name; never split a span pair); converters <code>toActivity</code>/<code>toCategory</code> (drop unknown keys, omit absent <code>spanId</code>). Builders gain name caps (activity 200, category 50) mirroring rules.</td><td><code>src/lib/build-user-profile.ts</code>, <code>get-given-name.ts</code>, <code>plan-dexie-migration.ts</code>, <code>firestore-converters.ts</code>, <code>build-activity.ts</code>, <code>build-category.ts</code> + co-located tests</td><td>—</td><td class="risk-low">Low</td></tr>
+  <tr><td>2 Core</td><td><code>firebase.ts</code> (see notes); <code>firestore-paths.ts</code> (<code>UserScope = { db, uid }</code>, <code>userDoc</code>, <code>activitiesCol</code>, <code>categoriesCol</code> with converters); <code>use-auth.ts</code>: <code>useAuth()</code> → <code>{ status: 'loading' | 'signed-out' | 'signed-in', user, scope }</code> via <code>onAuthStateChanged</code>, plus <code>signInWithGoogle()</code>, <code>signOutAndClear()</code>.</td><td><code>src/lib/firebase-config.ts</code>, <code>firebase.ts</code>, <code>firestore-paths.ts</code>, <code>use-auth.ts</code></td><td>0, 1</td><td class="risk-med">Med</td></tr>
+  <tr><td>2 Core</td><td>Hooks keep names and <code>undefined</code>-while-loading: <code>useActivities(date)</code>, <code>useActivitiesRange(start, end)</code>, <code>useCategories()</code> (defaults + custom), on a shared <code>useFirestoreQuery</code>. Writes take a scope: <code>addActivityRows(scope, rows)</code>, <code>getActivityRows(scope, row)</code>, <code>updateActivity(scope, row, input, categories)</code>, <code>deleteActivity(scope, row)</code>, <code>addCategory(scope, category)</code>, <code>getActivitiesInRange(scope, start, end)</code>. <code>use-sync-status.ts</code> with <code>trackWrite</code>.</td><td><code>use-firestore-query.ts</code>, <code>use-activities.ts</code>, <code>use-activities-range.ts</code>, <code>use-categories.ts</code>, <code>activity-writes.ts</code>, <code>category-writes.ts</code>, <code>use-sync-status.ts</code></td><td>above</td><td class="risk-med">Med</td></tr>
+  <tr><td>2 Core</td><td><code>ensureUserProfile(scope, user)</code>; <code>migrateLocalData({ scope, onStart, onProgress })</code>: device marker set → skip; <code>Dexie.exists</code> false → set marker, skip; read Dexie + remote ids/categories (<code>getDocs</code>) → plan → commit each batch → profile <code>migratedFromDexieAt</code> → device marker. Throw on failure (Dexie untouched, retried next start).</td><td><code>src/lib/user-profile.ts</code>, <code>migrate-local-data.ts</code></td><td>above</td><td class="risk-med">Med</td></tr>
+  <tr><td>2 Core</td><td>Security Rules + rules tests; SW <code>NetworkOnly</code> for Firebase traffic.</td><td><code>firestore.rules</code>, <code>tests/rules/firestore.rules.test.ts</code>, <code>src/app/sw.ts</code></td><td>0</td><td class="risk-med">Med</td></tr>
+  <tr><td>3 Wire</td><td>Pages use <code>useAuth().scope</code> for writes; <code>page.tsx</code> stops importing <code>db</code>; §1 screens connected. <code>db.ts</code> unchanged (frozen); <code>db.integration.test.ts</code> keeps schema/seed/index/upgrade tests only — write-path tests move to <code>tests/emulator/activity-writes.test.ts</code>.</td><td><code>src/app/*</code>, <code>src/components/*</code>, <code>src/lib/db.integration.test.ts</code></td><td>§1.3, phase 2</td><td class="risk-med">Med</td></tr>
+  <tr><td>3 Tests</td><td>Emulator integration tests; e2e support (<code>signInAs(page, user)</code> via <code>__sdtTest</code>, <code>seedActivities(uid, rows)</code> via Firestore emulator REST with <code>Authorization: Bearer owner</code>, unique uid per test). Playwright <code>webServer</code> becomes an array: <code>pnpm emulators</code> (wait on <code>http://127.0.0.1:8080</code>) + <code>NEXT_PUBLIC_FIREBASE_EMULATORS=1 PORT=3100 pnpm dev</code>. Every existing spec signs in first; Insights “with demo data” seeds <code>buildDemoActivities</code> via REST; “Clear &amp; start fresh” tests removed. <code>hosting.spec.ts</code>: signed-out routes show “Welcome”; a11y on ①.</td><td><code>tests/emulator/*.test.ts</code>, <code>tests/e2e/support/emulator.ts</code>, <code>tests/e2e/auth.spec.ts</code>, all <code>tests/e2e/*.spec.ts</code>, <code>playwright.config.ts</code></td><td>phase 3 Wire</td><td class="risk-high">High</td></tr>
+  <tr><td>4 CI</td><td>Both workflows, before <code>pnpm build</code>: <code>actions/setup-java@v4</code> (<code>distribution: temurin</code>, <code>java-version: '21'</code>), <code>actions/cache@v4</code> on <code>~/.cache/firebase/emulators</code>, <code>pnpm test:emulator</code>. No new secrets (<code>demo-sdt</code>).</td><td><code>.github/workflows/firebase-hosting-*.yml</code></td><td>phase 2</td><td class="risk-low">Low</td></tr>
+  <tr><td>4 Docs</td><td>ARCHITECTURE (data layer = Firestore, Status, test table), DECISIONS (ADR-001 superseded → ADR-007), <code>CLAUDE.md</code> tech stack + retire the Dexie/demo Coding Rules, README (dev with emulators).</td><td><code>docs/*.md</code>, <code>CLAUDE.md</code>, <code>README.md</code></td><td>all</td><td class="risk-low">Low</td></tr>
+  <tr><td>User</td><td>U10 deploy rules (blocks the live check and the merge), U11 optional preview domain, U12 live check — see below.</td><td>—</td><td>tester SHIP</td><td class="risk-med">Med</td></tr>
 </table>
+<div class="user"><strong>Việc của bạn (owner) — không ai khác làm được:</strong>
+<ul class="scope-list">
+  <li><strong>U10 · Deploy Firestore Security Rules (bắt buộc, trước khi merge F2).</strong> Sau khi tester báo SHIP: trên máy bạn, trong thư mục repo, checkout nhánh F2 rồi chạy <code>pnpm exec firebase login</code> (chỉ lần đầu) và <code>pnpm exec firebase deploy --only firestore:rules --project student-day-tracker</code>. Kiểm tra <em>Console → Firestore Database → Rules</em> thấy bản mới. Lý do: database đang ở production mode (chặn tất cả); nếu merge trước, web.app đăng nhập được nhưng không đọc/ghi được dữ liệu. Service account của GitHub chỉ có quyền Hosting nên CI không deploy rules — không cần cấp thêm quyền.</li>
+  <li><strong>U11 · (Tuỳ chọn) Thử đăng nhập trên PR preview.</strong> <em>Authentication → Settings → Authorized domains → Add domain</em>: tên miền preview trong comment của bot (dạng <code>student-day-tracker--pr…web.app</code>); xoá sau khi thử.</li>
+  <li><strong>U12 · Kiểm tra thật sau merge.</strong> Mở https://student-day-tracker.web.app, đăng nhập bằng tài khoản Google thật, thêm 1 activity, mở trên thiết bị thứ hai thấy cùng dữ liệu, rồi Sign out. Báo lại kết quả.</li>
+</ul></div>
+
 <h3>2.6 Testing strategy</h3>
 <table>
   <tr><th>Layer</th><th>Proves</th><th>File</th></tr>
-  <tr><td>Unit</td><td>Profile fields and name fallback; chunking at 0 / 500 / 501 rows.</td><td><code>build-user-profile.test.ts</code>, <code>chunk-for-batches.test.ts</code></td></tr>
-  <tr><td>Rules</td><td>Own data allowed; other users' data and unauthenticated access denied.</td><td><code>tests/rules/</code> (Firestore emulator, JDK 21)</td></tr>
-  <tr><td>Integration</td><td>Migration of Dexie rows (incl. <code>spanId</code> pairs) is complete and idempotent.</td><td>Auth + Firestore emulators</td></tr>
-  <tr><td>E2E + a11y</td><td>Gate → emulator sign-in → Home; offline add after sign-in; sign out clears; 0 axe violations on the sign-in screen and account menu.</td><td><code>tests/e2e/auth.spec.ts</code>, <code>a11y.spec.ts</code></td></tr>
+  <tr><td>Unit</td><td>Profile fields; given-name fallbacks; migration plan at 0 / 500 / 501 / 600 ops, pair at the 500 boundary stays together, demo/default/remote-id skips, same-name remap, re-plan after success = <code>[]</code>; converters; builder name caps.</td><td><code>src/lib/*.test.ts</code> (<code>pnpm test</code>)</td></tr>
+  <tr><td>Rules</td><td>Owner CRUD allowed; other user and unauthenticated denied on all three paths; invalid activity (end ≤ start, end 1441, bad date, extra key, <code>id</code> ≠ doc id) denied; <code>isDefault: true</code> category denied; profile delete and <code>createdAt</code> change denied.</td><td><code>tests/rules/firestore.rules.test.ts</code> (<code>pnpm test:emulator</code>)</td></tr>
+  <tr><td>Integration</td><td>Real modular SDK against emulators, signed in with a fake credential: activity writes (span add/edit across dates/delete as one batch, range query); migration from <code>fake-indexeddb</code> Dexie (600 rows, progress callbacks, markers last, re-run writes 0); two app instances with the same uid see each other's writes.</td><td><code>tests/emulator/activity-writes.test.ts</code>, <code>migrate-local-data.test.ts</code></td></tr>
+  <tr><td>Integration</td><td>Dexie schema/seed/indexes/upgrade still open (migration source).</td><td><code>src/lib/db.integration.test.ts</code></td></tr>
+  <tr><td>E2E</td><td>Gate on every route; real button through the Auth emulator popup (“Add new account” → “Auto-generate user information” → “Sign in with Google.com”) creates <code>users/{uid}</code>; seeded Dexie → ④ → rows on Home; offline add/sync; sign out clears; second user sees nothing of the first; existing Home/History/Insights flows after sign-in.</td><td><code>tests/e2e/auth.spec.ts</code> + updated specs (<code>pnpm test:e2e</code>)</td></tr>
+  <tr><td>a11y</td><td>0 axe violations on ①, ③, ④, ⑥ popover, ⑧ sheet, <code>/privacy</code>, and signed-in Home/History/Insights.</td><td><code>tests/e2e/a11y.spec.ts</code></td></tr>
+  <tr><td>Hosting</td><td>Built <code>out/</code> on the Hosting emulator: routes render ① signed out; headers unchanged.</td><td><code>tests/e2e/hosting.spec.ts</code> (<code>pnpm test:e2e:hosting</code>)</td></tr>
 </table>
-<div class="note">No real Google account or credentials in tests: the Auth emulator signs in fake users. Real Google sign-in is checked by hand on the PR preview — which requires adding that preview domain to Authorized domains first.</div>
-
+<div class="note">No real Google account or credentials in automated tests: Auth emulator + <code>demo-sdt</code> only. Real Google sign-in is the owner's manual check (U12), after U10.</div>
 
 <h3>2.7 Success criteria (tester grades §1–2 against this)</h3>
 <ul class="checklist">
-  <li>Signed-out visitors see only the sign-in screen; it has 0 axe violations.</li>
-  <li>First Google sign-in creates the account: <code>users/{uid}</code> has name, email, <code>createdAt</code>, <code>privacyAcceptedAt</code>. No sign-up form exists.</li>
-  <li>Existing local activities (incl. cross-midnight pairs) and custom categories appear in the account after the first sign-in; re-running migration changes nothing.</li>
-  <li>After the first sign-in, adding an activity offline works and syncs when back online.</li>
-  <li>The same account on a second device/browser shows the same data.</li>
-  <li>The account menu shows avatar, name, email; Sign out returns to the sign-in screen and clears the local cache.</li>
-  <li>The Home greeting uses the Google display name.</li>
-  <li>Rules tests: another user's data and unauthenticated access are denied.</li>
-  <li>typecheck, check, unit, rules tests, build, e2e and a11y all pass; no credentials committed.</li>
-  <li>Manual: real Google sign-in works on https://student-day-tracker.web.app.</li>
-  <li>The built screens match the §1.2 mockups (layout, copy, states); any deviation is listed in the handoff.</li>
+  <li>The built screens match the approved mockups ①–⑧ (layout, copy, states, desktop + mobile); any deviation is listed in the handoff.</li>
+  <li>Signed-out visitors see only ① on <code>/</code>, <code>/history/</code>, <code>/insights/</code>; <code>/privacy/</code> is readable signed out; a persisted session never flashes ①.</li>
+  <li>First Google sign-in creates <code>users/{uid}</code> with exactly the 2.4 profile fields (<code>privacyAcceptedAt</code> = <code>createdAt</code>); no sign-up form exists; no default category docs are written.</li>
+  <li>Activities and custom categories are stored at the 2.4 paths with today's ids/fields; a cross-midnight activity is two docs sharing <code>spanId</code>, edited/deleted in one batch.</li>
+  <li>Migration: local activities (incl. pairs) and custom categories appear after the first sign-in with ④; demo rows and defaults are not migrated; re-running writes nothing; a second account on the same device gets no local data.</li>
+  <li>After the first sign-in, add/edit/delete work offline (form closes immediately) and sync when back online; sync status shows pending/offline/synced.</li>
+  <li>Two clients signed in as the same uid see the same data.</li>
+  <li>The account menu (⑥ desktop, ⑧ mobile) shows initial, name, email, sync status; Sign out returns to ① and deletes the Firestore cache; offline with pending writes asks first.</li>
+  <li>The Home greeting uses the given name from the Google display name.</li>
+  <li>Rules tests pass for every case in 2.6; <code>firestore.rules</code> is referenced from <code>firebase.json</code>.</li>
+  <li>The service worker does not cache <code>*.googleapis.com</code> or <code>/__/*</code> requests.</li>
+  <li><code>typecheck</code>, <code>check</code>, <code>test</code>, <code>test:emulator</code>, <code>build</code>, <code>test:e2e</code> (incl. a11y, 0 violations), <code>test:e2e:hosting</code> all pass; both workflows run <code>test:emulator</code> with Java 21.</li>
+  <li>No credentials committed (only the public <code>firebaseConfig</code>); <code>out/</code> contains no <code>__sdtTest</code> or emulator host.</li>
+  <li>Docs updated: ARCHITECTURE data layer + Status, ADR-001 marked superseded, <code>CLAUDE.md</code> stack and Coding Rules.</li>
+  <li>Owner (after U10): real Google sign-in works on https://student-day-tracker.web.app and data appears on a second device (U12).</li>
 </ul>
 
 
