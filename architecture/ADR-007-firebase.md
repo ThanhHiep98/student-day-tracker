@@ -120,8 +120,8 @@ flowchart TD
   cache -- no --> on{Online and<br/>under quota?}
   on -- no --> rule
   on -- yes --> agg[Build aggregated,<br/>non-identifying summary]
-  agg --> call[AI Logic → Gemini<br/>with App Check token]
-  call --> res{Success?}
+  agg --> callAI[AI Logic → Gemini<br/>with App Check token]
+  callAI --> res{Success?}
   res -- yes --> save[Cache comment for today] --> show
   res -- no --> rule
   rule --> done([Done])
