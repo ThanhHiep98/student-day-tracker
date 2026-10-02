@@ -1,0 +1,84 @@
+rules_version = '2';
+
+// Student Day Tracker — Firestore Security Rules (F2,
+// plans/2026-10-01-v2-roadmap-cross-midnight.html §2.4).
+// Spec: tests/rules/firestore.rules.test.ts (pnpm test:emulator).
+// Field limits mirror the pure builders (build-activity.ts, build-category.ts,
+// build-user-profile.ts). Deployed by the owner (U10), not by CI.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function str(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+
+    function intIn(v, lo, hi) {
+      return v is int && v >= lo && v <= hi;
+    }
+
+    function validProfile(d) {
+      return d.keys().hasAll(['displayName', 'email', 'photoURL', 'createdAt', 'privacyAcceptedAt'])
+        && d.keys().hasOnly(['displayName', 'email', 'photoURL', 'createdAt', 'privacyAcceptedAt',
+                             'migratedFromDexieAt'])
+        && str(d.displayName, 0, 200)
+        && str(d.email, 0, 320)
+        && (d.photoURL == null || str(d.photoURL, 1, 2048))
+        && d.createdAt is number
+        && d.privacyAcceptedAt is number
+        && (!('migratedFromDexieAt' in d) || d.migratedFromDexieAt is number);
+    }
+
+    // Times: start 0-1439, end 1-1440 (end-exclusive; 1440 = ends at midnight).
+    // A cross-midnight activity is two docs sharing spanId.
+    function validActivity(id, d) {
+      return d.keys().hasAll(['id', 'categoryId', 'name', 'date', 'startMinutes', 'endMinutes',
+                              'createdAt'])
+        && d.keys().hasOnly(['id', 'categoryId', 'name', 'date', 'startMinutes', 'endMinutes',
+                             'spanId', 'createdAt'])
+        && d.id == id
+        && str(d.categoryId, 1, 100)
+        && str(d.name, 1, 200)
+        && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && intIn(d.startMinutes, 0, 1439)
+        && intIn(d.endMinutes, 1, 1440)
+        && d.startMinutes < d.endMinutes
+        && d.createdAt is number
+        && (!('spanId' in d) || str(d.spanId, 1, 100));
+    }
+
+    // Only custom categories are stored; the defaults live in code.
+    function validCategory(id, d) {
+      return d.keys().hasAll(['id', 'name', 'color', 'icon', 'isDefault', 'createdAt'])
+        && d.keys().hasOnly(['id', 'name', 'color', 'icon', 'isDefault', 'createdAt'])
+        && d.id == id
+        && str(d.name, 1, 50)
+        && d.color is string && d.color.matches('^#[0-9a-fA-F]{6}$')
+        && str(d.icon, 1, 16)
+        && d.isDefault == false
+        && d.createdAt is number;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validProfile(request.resource.data);
+      allow update: if isOwner(uid) && validProfile(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['migratedFromDexieAt', 'displayName', 'photoURL']);
+      // No delete: account deletion is a follow-up (plan §2.2 Q2).
+
+      match /activities/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validActivity(id, request.resource.data);
+      }
+
+      match /categories/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validCategory(id, request.resource.data);
+      }
+    }
+  }
+}

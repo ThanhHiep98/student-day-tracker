@@ -1,11 +1,11 @@
 'use client';
 
+import { MobileAccountButton } from '@/components/account-menu';
 import { ActivityTimeline } from '@/components/activity-timeline';
 import { AddActivityForm, type AddActivityFormValues } from '@/components/add-activity-form';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DailyDonutChart } from '@/components/daily-donut-chart';
 import { DailySummaryCard } from '@/components/daily-summary-card';
-import { DemoBanner } from '@/components/demo-banner';
 import { InstallBanner } from '@/components/install-banner';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { RecentActivityRail } from '@/components/recent-activity-rail';
@@ -20,13 +20,15 @@ import {
 } from '@/lib/activity-writes';
 import { buildActivity } from '@/lib/build-activity';
 import { buildCategory } from '@/lib/build-category';
-import { db } from '@/lib/db';
+import { addCategory } from '@/lib/category-writes';
+import { DEFAULT_CATEGORIES } from '@/lib/default-categories';
 import { getDailySummary } from '@/lib/get-daily-summary';
+import { getGivenName } from '@/lib/get-given-name';
 import { toIsoDate } from '@/lib/iso-date';
 import type { Activity, Category } from '@/lib/types';
 import { useActivities } from '@/lib/use-activities';
+import { useAuth } from '@/lib/use-auth';
 import { useCategories } from '@/lib/use-categories';
-import { useDemoData } from '@/lib/use-demo-data';
 import { useInstallPrompt } from '@/lib/use-install-prompt';
 import { useState } from 'react';
 
@@ -36,6 +38,8 @@ const GREETING_BY_HOUR = (hour: number) => {
   return 'Good evening';
 };
 
+const BUILT_IN_CATEGORIES: Category[] = [...DEFAULT_CATEGORIES];
+
 type FormState =
   | { open: false }
   | { open: true; mode: 'add' }
@@ -44,19 +48,24 @@ type FormState =
 /**
  * Home — req. 1. Add/Edit/Delete Activity and "+ New category" build rows
  * with the pure builders (build-activity.ts / build-category.ts, which own
- * validation and throw user-facing messages) and write them to Dexie; the
- * live queries re-render the Timeline and Daily summary. A builder or Dexie
- * error propagates to AddActivityForm, which shows it inline.
+ * validation and throw user-facing messages) and queue them as Firestore
+ * writes for the signed-in user; the live queries re-render the Timeline and
+ * Daily summary at once, online or offline. A builder error propagates to
+ * AddActivityForm, which shows it inline.
  *
  * A cross-midnight activity is two rows (activity-writes.ts): Edit opens the
- * whole span from either row, and save/delete act on both in one transaction.
+ * whole span from either row, and save/delete act on both in one batch.
  */
 export default function Home() {
   const today = toIsoDate(new Date());
   const activities = useActivities(today);
   const categories = useCategories();
   const { canInstall, install, dismiss } = useInstallPrompt();
-  const { isDemo, clearDemo } = useDemoData();
+  const { user, scope } = useAuth();
+  const givenName = user ? getGivenName(user.displayName, user.email) : null;
+  // The built-in categories live in code, so logging works before the stored
+  // custom ones arrive (a fresh account's first snapshot needs the server).
+  const formCategories = categories ?? BUILT_IN_CATEGORIES;
 
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
@@ -70,21 +79,32 @@ export default function Home() {
 
   const summary = activities && categories ? getDailySummary(activities, categories) : undefined;
 
+  // The auth gate only renders pages once signed in, so `scope` is set here.
+  function requireScope() {
+    if (!scope) throw new Error('You are signed out. Sign in again to save changes.');
+    return scope;
+  }
+
   async function handleCreateCategory(name: string): Promise<Category> {
-    const category = buildCategory(name, categories ?? [], {
+    // Dedupe needs the stored custom categories, not just the built-in ones.
+    if (!categories) throw new Error('Still loading your categories — try again in a moment.');
+    const category = buildCategory(name, categories, {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
     });
-    await db.categories.add(category);
+    addCategory(requireScope(), category);
     return category;
   }
 
+  // Writes are queued, not awaited (offline they'd wait for the server), so
+  // the form closes immediately; only builder validation errors are thrown.
   async function handleSubmit(values: AddActivityFormValues) {
     if (formState.open && formState.mode === 'edit') {
-      await updateActivity(formState.activity, values, categories ?? []);
+      await updateActivity(requireScope(), formState.activity, values, formCategories);
     } else {
-      await addActivityRows(
-        buildActivity(values, categories ?? [], {
+      addActivityRows(
+        requireScope(),
+        buildActivity(values, formCategories, {
           id: crypto.randomUUID(),
           createdAt: Date.now(),
         })
@@ -94,14 +114,14 @@ export default function Home() {
   }
 
   async function handleEdit(activity: Activity) {
-    const rows = await getActivityRows(activity);
+    const rows = await getActivityRows(requireScope(), activity);
     if (rows.length === 0) return; // Already deleted; the live query will drop the row.
     setFormState({ open: true, mode: 'edit', activity, initialValues: mergeActivitySpan(rows) });
   }
 
-  async function handleDeleteConfirmed() {
-    if (confirmDelete) {
-      await deleteActivity(confirmDelete);
+  function handleDeleteConfirmed() {
+    if (confirmDelete && scope) {
+      deleteActivity(scope, confirmDelete);
       setConfirmDelete(null);
     }
   }
@@ -112,6 +132,7 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             {GREETING_BY_HOUR(now.getHours())}
+            {givenName ? `, ${givenName}` : ''}
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">{dateLabel}</p>
         </div>
@@ -119,16 +140,16 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setFormState({ open: true, mode: 'add' })}
-            className="rounded-full bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:focus-visible:outline-zinc-100"
+            className="rounded-full bg-zinc-900 px-3.5 py-2 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:focus-visible:outline-zinc-100"
           >
             + Add Activity
           </button>
-          <ThemeToggle />
+          <ThemeToggle className="hidden sm:flex" />
+          <MobileAccountButton className="sm:hidden" />
         </div>
       </header>
 
       {canInstall && <InstallBanner onInstall={install} onDismiss={dismiss} />}
-      {isDemo && <DemoBanner onClear={clearDemo} />}
 
       {activities === undefined || categories === undefined ? (
         <LoadingSkeleton />
@@ -164,7 +185,7 @@ export default function Home() {
       <AddActivityForm
         open={formState.open}
         mode={formState.open ? formState.mode : 'add'}
-        categories={categories ?? []}
+        categories={formCategories}
         defaultDate={today}
         initialValues={
           formState.open && formState.mode === 'edit' ? formState.initialValues : undefined

@@ -1,30 +1,21 @@
 import { expect, test } from '@playwright/test';
+import { openSignedIn } from './support/emulator';
 
 /**
- * Environment-scaffold smoke test: the three top-level sections from the
- * requirement doc (Home / History / Insights) render and the nav links
- * between them. Deeper flows (add/edit/delete activity, charts) are feature
- * work for the Implement agent — see CLAUDE.md.
+ * Smoke test: the three top-level sections from the requirement doc
+ * (Home / History / Insights) render for a signed-in user and the nav links
+ * between them. Signed-out behaviour lives in auth.spec.ts.
  */
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('sdt-install-dismissed', '1');
-    localStorage.setItem('sdt-demo-dismissed', '1');
-  });
+  await openSignedIn(page);
 });
 
 test('Home renders the daily summary and an empty timeline', async ({ page }) => {
-  await page.goto('/');
-  await expect(
-    page.getByRole('heading', { name: /good (morning|afternoon|evening)/i })
-  ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'No activities yet today' })).toBeVisible();
 });
 
 test('nav bar moves between Home, History, and Insights', async ({ page }) => {
-  await page.goto('/');
-
   await page.getByRole('link', { name: 'History' }).click();
   await expect(page).toHaveURL('/history/');
   await expect(page.getByRole('heading', { name: 'History', exact: true })).toBeVisible();

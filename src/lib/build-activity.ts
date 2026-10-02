@@ -27,6 +27,9 @@ export interface ActivityUpdate {
   deleteIds: string[];
 }
 
+/** Longest activity name; firestore.rules enforces the same limit. */
+export const ACTIVITY_NAME_MAX = 200;
+
 const LAST_MINUTE_OF_DAY = MINUTES_PER_DAY - 1;
 const TAIL_ID_SUFFIX = '-next';
 
@@ -43,6 +46,9 @@ function isMinuteOfDay(value: number): boolean {
 function validateActivityInput(input: ActivityInput, categories: Category[]): ActivityInput {
   const name = input.name.trim();
   if (!name) throw new Error('Name is required.');
+  if (name.length > ACTIVITY_NAME_MAX) {
+    throw new Error(`Name must be ${ACTIVITY_NAME_MAX} characters or fewer.`);
+  }
   if (!categories.some((c) => c.id === input.categoryId)) throw new Error('Choose a category.');
   if (!isIsoDate(input.date)) throw new Error('Choose a valid date.');
   if (!isMinuteOfDay(input.startMinutes) || !isMinuteOfDay(input.endMinutes)) {

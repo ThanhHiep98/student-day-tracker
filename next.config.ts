@@ -15,6 +15,15 @@ const nextConfig: NextConfig = {
   // `trailingSlash: true`.
   output: 'export',
   trailingSlash: true,
+  // Dev only: keep the Next.js dev-tools badge off the sidebar's bottom-left
+  // account block (⑤), where it would cover the button.
+  devIndicators: { position: 'bottom-right' },
+  // Always define the emulator flag (empty unless set), so production builds
+  // inline `'' === '1'` and drop the emulator-only branch in src/lib/firebase.ts
+  // (no `__sdtTest`, no emulator host in out/).
+  env: {
+    NEXT_PUBLIC_FIREBASE_EMULATORS: process.env.NEXT_PUBLIC_FIREBASE_EMULATORS ?? '',
+  },
 };
 
 export default withSerwist(nextConfig);

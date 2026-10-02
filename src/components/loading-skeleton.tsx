@@ -1,5 +1,5 @@
 /**
- * Placeholder shown while Dexie's live queries resolve on first paint.
+ * Placeholder shown while the live Firestore queries resolve on first paint.
  * Mirrors the rough shape of the loaded UI so the layout doesn't jump.
  */
 export function LoadingSkeleton() {

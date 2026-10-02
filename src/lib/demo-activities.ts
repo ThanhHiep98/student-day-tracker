@@ -1,95 +1,13 @@
-import { addDays } from './iso-date';
-import type { Activity, IsoDate } from './types';
+import type { Activity } from './types';
 
-/** Demo rows are identified by this id prefix (plan §2.2 D7) — no schema field. */
+/**
+ * Pre-F2 builds seeded a demo week into Dexie with ids prefixed `demo-`. Demo
+ * mode is retired (plan §2.2 Q9: a new account starts empty); the prefix now
+ * only marks local rows the one-time migration must not copy into an account
+ * (§2.2 Q4).
+ */
 export const DEMO_ID_PREFIX = 'demo-';
 
 export function isDemoActivity(activity: Pick<Activity, 'id'>): boolean {
   return activity.id.startsWith(DEMO_ID_PREFIX);
-}
-
-type DemoEntry = [name: string, categoryId: string, startMinutes: number, endMinutes: number];
-
-const t = (hh: number, mm = 0) => hh * 60 + mm;
-
-/**
- * Demo activities spanning today + the past 6 days — enough for History's
- * calendar to have several populated days to click into, not just today.
- * Written straight into Dexie (see use-demo-data.ts), so Home, History, and
- * Insights all read the SAME data
- * instead of each page inventing its own numbers.
- *
- * Every id is `demo-${uuid}` so "Clear & start fresh" can delete exactly the
- * demo rows and nothing the user added.
- */
-const DAYS_AGO_TO_ENTRIES: Record<number, DemoEntry[]> = {
-  0: [
-    ['Design landing page', 'work', t(9, 30), t(11, 45)],
-    ['Study UX', 'study', t(12, 30), t(14)],
-    ['Gym', 'exercise', t(15), t(15, 45)],
-    ['Gaming', 'entertainment', t(20), t(21, 10)],
-  ],
-  1: [
-    ['Team standup', 'work', t(9), t(9, 30)],
-    ['Read textbook', 'study', t(10), t(11, 30)],
-    ['Run', 'exercise', t(18), t(18, 40)],
-    ['Movie night', 'entertainment', t(21), t(22, 30)],
-  ],
-  2: [
-    ['Client meeting', 'work', t(10), t(11)],
-    ['Math homework', 'study', t(14), t(15, 30)],
-    ['Yoga', 'exercise', t(7), t(7, 30)],
-  ],
-  3: [
-    ['Code review', 'work', t(9), t(10, 15)],
-    ['Group project', 'study', t(13), t(15)],
-    ['Basketball', 'exercise', t(17), t(18)],
-    ['Podcast', 'entertainment', t(20, 30), t(21)],
-  ],
-  4: [
-    ['Design landing page', 'work', t(9, 30), t(12)],
-    ['Study UX', 'study', t(13), t(14, 30)],
-  ],
-  5: [
-    ['Sprint planning', 'work', t(9), t(10)],
-    ['Library research', 'study', t(11), t(13)],
-    ['Swim', 'exercise', t(16), t(16, 45)],
-    ['Gaming', 'entertainment', t(19, 30), t(21)],
-  ],
-  6: [
-    ['Bug fixing', 'work', t(9), t(11, 30)],
-    ['Flashcards review', 'study', t(20), t(20, 30)],
-  ],
-};
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Pure — `today`, `now` and the id generator are passed in, so the caller
- * owns the clock and tests are deterministic.
- */
-export function buildDemoActivities(
-  today: IsoDate,
-  now: number,
-  makeId: () => string = () => crypto.randomUUID()
-): Activity[] {
-  const activities: Activity[] = [];
-
-  for (const [daysAgoStr, entries] of Object.entries(DAYS_AGO_TO_ENTRIES)) {
-    const daysAgo = Number(daysAgoStr);
-    const date = addDays(today, -daysAgo);
-    entries.forEach(([name, categoryId, startMinutes, endMinutes], i) => {
-      activities.push({
-        id: `${DEMO_ID_PREFIX}${makeId()}`,
-        name,
-        categoryId,
-        date,
-        startMinutes,
-        endMinutes,
-        createdAt: now - daysAgo * DAY_MS + i,
-      });
-    });
-  }
-
-  return activities;
 }

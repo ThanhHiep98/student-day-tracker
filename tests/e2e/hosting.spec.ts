@@ -7,6 +7,9 @@ import { expect, test } from '@playwright/test';
  * redirect, 404, cache headers, root-scoped manifest. Runs only via
  * `pnpm build && pnpm test:e2e:hosting` (Hosting emulator, project
  * demo-sdt) or against a real URL with PLAYWRIGHT_BASE_URL.
+ *
+ * Since F2 every route is behind the auth gate, so a fresh (signed-out)
+ * browser sees the sign-in screen ① on each of them; /privacy/ stays public.
  */
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -14,19 +17,20 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-const routes = [
-  { path: '/', heading: /good (morning|afternoon|evening)/i },
-  { path: '/history/', heading: 'History' },
-  { path: '/insights/', heading: 'Insights' },
-] as const;
-
-for (const { path, heading } of routes) {
-  test(`${path} returns 200 and renders its heading`, async ({ page }) => {
+for (const path of ['/', '/history/', '/insights/']) {
+  test(`${path} returns 200 and shows the sign-in screen when signed out`, async ({ page }) => {
     const response = await page.goto(path);
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole('heading', { name: heading, exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   });
 }
+
+test('/privacy/ returns 200 and is readable signed out', async ({ page }) => {
+  const response = await page.goto('/privacy/');
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Thông báo về quyền riêng tư' })).toBeVisible();
+});
 
 test('/history redirects to /history/', async ({ request }) => {
   const response = await request.get('/history', { maxRedirects: 0 });
@@ -63,11 +67,9 @@ test('the manifest is scoped to the domain root', async ({ request }) => {
   expect(manifest.scope).toBe('/');
 });
 
-test('hosted / has no accessibility violations', async ({ page }) => {
+test('hosted sign-in screen ① has no accessibility violations', async ({ page }) => {
   await page.goto('/');
-  await expect(
-    page.getByRole('heading', { name: /good (morning|afternoon|evening)/i })
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
   const { violations } = await new AxeBuilder({ page }).analyze();
   expect(violations).toEqual([]);
 });

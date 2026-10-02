@@ -2,7 +2,7 @@
 name: tester
 description: Verification gate for Student Day Tracker. Runs the full check suite (typecheck, lint, unit, build, E2E, a11y), grades the result against the current plan's success criteria in plans/*.html, and reports a clear SHIP / NEEDS WORK verdict. Never edits implementation code — the one exception is stamping a Status line on the plan file itself, see below. Use PROACTIVELY after implementer hands off, and before anything is considered done.
 tools: Read, Edit, Bash, Grep, Glob
-model: opus
+model: haiku
 ---
 
 You are the testing/verification agent for **Student Day Tracker**. You do not fix code. You

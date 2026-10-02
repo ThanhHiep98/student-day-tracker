@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { SidebarAccount } from './account-menu';
+import { AppLogo } from './app-logo';
 
 const TABS = [
   { href: '/', label: 'Home' },
@@ -25,7 +27,8 @@ const ICONS: Record<(typeof TABS)[number]['href'], ReactNode> = {
  * Left sidebar navigation for wide viewports — the desktop counterpart to
  * NavBar's bottom tab bar (kept for narrow viewports). Same 3 sections from
  * the requirement doc's sitemap; matches the desktop mockup's left nav
- * column (req. 1, "1.1 + 1.2 bản đầy đủ").
+ * column (req. 1, "1.1 + 1.2 bản đầy đủ"). The signed-in account block
+ * (⑤ ⑥) is pinned to its bottom.
  */
 export function SidebarNav() {
   const pathname = usePathname();
@@ -36,24 +39,7 @@ export function SidebarNav() {
       className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-1 border-r border-border bg-surface/60 px-3 py-6 sm:flex"
     >
       <div className="mb-6 flex items-center gap-2 px-2">
-        <span
-          aria-hidden
-          className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-sm shadow-indigo-600/30"
-        >
-          <svg
-            viewBox="0 0 20 20"
-            className="size-4.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <title>Student Day Tracker</title>
-            <circle cx="10" cy="10" r="7" />
-            <path d="M10 6v4l3 2" />
-          </svg>
-        </span>
+        <AppLogo />
         <span className="min-w-0 text-sm leading-tight font-semibold tracking-tight">
           Student Day Tracker
         </span>
@@ -89,6 +75,8 @@ export function SidebarNav() {
           </Link>
         );
       })}
+
+      <SidebarAccount />
     </nav>
   );
 }

@@ -31,6 +31,20 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm check
       - run: pnpm test --run
+
+      # Security Rules + Firestore integration tests on the Auth/Firestore
+      # emulators (project demo-sdt, no secrets). The emulators need Java 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: firebase-emulators-${{ runner.os }}-
+      - run: pnpm test:emulator
+
       - run: pnpm build
 
       - uses: FirebaseExtended/action-hosting-deploy@v0

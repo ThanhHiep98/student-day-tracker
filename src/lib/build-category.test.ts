@@ -22,6 +22,13 @@ describe('buildCategory', () => {
     expect(() => buildCategory('   ', defaults, meta)).toThrow('Category name is required.');
   });
 
+  it('caps the name at 50 characters (mirrors firestore.rules)', () => {
+    expect(buildCategory('x'.repeat(50), defaults, meta).name).toHaveLength(50);
+    expect(() => buildCategory('x'.repeat(51), defaults, meta)).toThrow(
+      'Category name must be 50 characters or fewer.'
+    );
+  });
+
   it('dedupes case-insensitively against defaults and custom categories', () => {
     expect(() => buildCategory('work', defaults, meta)).toThrow('That category already exists.');
     const custom = buildCategory('Other', defaults, meta);

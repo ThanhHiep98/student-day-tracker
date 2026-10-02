@@ -11,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Student Day Tracker',
     short_name: 'Day Tracker',
     description:
-      'Offline-first daily activity tracker for students — timeline, calendar history, and insights. Installable PWA, works without a network.',
+      'Daily activity tracker for students — timeline, calendar history, and insights. Sign in with Google to sync across devices; works offline.',
     start_url: '/',
     scope: '/',
     display: 'standalone',
