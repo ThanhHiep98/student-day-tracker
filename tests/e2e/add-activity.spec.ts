@@ -1,16 +1,14 @@
 import { type Page, expect, test } from '@playwright/test';
+import { openSignedIn } from './support/emulator';
 
 /**
- * Add / Edit / Delete Activity and "+ New category" write to Dexie
- * (plans/2026-09-26-add-activity.html §2), so every flow is asserted again
- * after page.reload() to prove persistence.
+ * Add / Edit / Delete Activity and "+ New category" write to the signed-in
+ * user's Firestore data (plans/2026-09-26-add-activity.html §2, F2 §2.4), so
+ * every flow is asserted again after page.reload() to prove persistence —
+ * the session survives the reload, too.
  */
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('sdt-install-dismissed', '1');
-    localStorage.setItem('sdt-demo-dismissed', '1');
-  });
-  await page.goto('/');
+  await openSignedIn(page);
 });
 
 async function addActivity(page: Page, name: string, start: string, end: string) {

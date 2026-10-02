@@ -1,8 +1,10 @@
 import { type Page, expect, test } from '@playwright/test';
+import { openSignedIn, seedActivities } from './support/emulator';
+import { buildSampleWeek } from './support/sample-week';
 
 /**
- * Insights is computed from real Dexie data through the pure helpers
- * (plans/2026-09-26-add-activity.html §2.5 phase 4).
+ * Insights is computed from the signed-in user's real Firestore data through
+ * the pure helpers (plans/2026-09-26-add-activity.html §2.5 phase 4).
  */
 async function addActivity(page: Page, name: string, start: string, end: string) {
   await page.getByRole('button', { name: '+ Add Activity' }).click();
@@ -14,16 +16,17 @@ async function addActivity(page: Page, name: string, start: string, end: string)
   await expect(dialog).toBeHidden();
 }
 
-test.describe('with demo data dismissed', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('sdt-install-dismissed', '1');
-      localStorage.setItem('sdt-demo-dismissed', '1');
-    });
+/** Today as YYYY-MM-DD in the browser's timezone. */
+async function browserToday(page: Page) {
+  return page.evaluate(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
+}
 
+test.describe('a new account', () => {
   test('shows the empty and insufficient-data states with no data', async ({ page }) => {
-    await page.goto('/insights');
+    await openSignedIn(page, '/insights');
     await expect(
       page.getByRole('heading', { name: 'Nothing tracked this week yet' })
     ).toBeVisible();
@@ -39,7 +42,7 @@ test.describe('with demo data dismissed', () => {
   test('a newly added activity shows up in Weekly, Insight cards and Analytics', async ({
     page,
   }) => {
-    await page.goto('/');
+    await openSignedIn(page);
     await addActivity(page, 'Deep work session', '09:00', '10:30');
 
     await page.getByRole('link', { name: 'Insights' }).click();
@@ -66,53 +69,19 @@ test.describe('with demo data dismissed', () => {
   });
 });
 
-test.describe('with demo data', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('sdt-install-dismissed', '1');
-    });
-  });
-
-  test('shows the demo banner; Clear removes only demo rows', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.getByText('Demo data')).toBeVisible();
-    await addActivity(page, 'My real task', '06:00', '06:45');
+test.describe('with a week of data', () => {
+  test('a seeded week fills every Insights section', async ({ page }) => {
+    const user = await openSignedIn(page);
+    await seedActivities(user.uid, buildSampleWeek(await browserToday(page), Date.now()));
 
     await page.getByRole('link', { name: 'Insights' }).click();
-    await expect(page.getByText('Demo data')).toBeVisible();
     const analytics = page.getByRole('region', { name: 'Activity analytics' });
     await expect(analytics.getByRole('button', { name: 'Gym' })).toBeVisible();
-
-    await page.getByRole('button', { name: 'Clear & start fresh' }).click();
-
-    await expect(page.getByText('Demo data')).toHaveCount(0);
-    await expect(analytics.getByRole('button', { name: 'Gym' })).toHaveCount(0);
-    await expect(analytics.getByRole('button', { name: 'My real task' })).toBeVisible();
-    await expect(
-      page.getByRole('region', { name: 'Weekly overview' }).getByText('45m').first()
-    ).toBeVisible();
-
-    await page.reload();
-    await expect(page.getByText('Demo data')).toHaveCount(0);
-    await expect(analytics.getByRole('button', { name: 'My real task' })).toBeVisible();
-  });
-
-  test('Clear on Insights with only demo data shows the empty states', async ({ page }) => {
-    await page.goto('/insights');
-    await expect(page.getByText('Demo data')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Weekly overview' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Nothing tracked this week yet' })).toHaveCount(
       0
     );
-
-    await page.getByRole('button', { name: 'Clear & start fresh' }).click();
-
-    await expect(
-      page.getByRole('heading', { name: 'Nothing tracked this week yet' })
-    ).toBeVisible();
-    await expect(page.getByText('Track a few more days to unlock insights.')).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Nothing tracked this month yet' })
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'No activities this month yet' })).toBeVisible();
+    // Demo mode is retired: real data never comes with a demo banner.
+    await expect(page.getByText('Demo data')).toHaveCount(0);
   });
 });
