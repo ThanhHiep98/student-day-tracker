@@ -10,13 +10,13 @@ interface ActivityTimelineProps {
   onDelete?: (activity: Activity) => void;
 }
 
-/** HH:MM; an end of 1440 (midnight) renders as 00:00. */
 /** Suffix for a row that is one half of a cross-midnight span. */
 function spanSuffix(activity: Activity): string {
   if (activity.spanId === undefined) return '';
   return isSpanTail(activity) ? ' · from previous day' : ' · continues next day';
 }
 
+/** HH:MM; an end of 1440 (midnight) renders as 00:00. */
 function formatClock(minutes: number): string {
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;

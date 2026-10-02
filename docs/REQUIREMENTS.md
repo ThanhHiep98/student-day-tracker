@@ -93,7 +93,7 @@ Interim defaults from `plans/2026-09-26-add-activity.html` §2.2 — revisit the
 | D2 | Not enough data | Compare shows a note instead of numbers when last week's matching days are empty; a category new this week is labelled "new this week"; no qualifying card → "track a few more days" |
 | D3 | Week / month | Mon–Sun calendar week (matches History); Compare = this week so far vs. the same weekdays last week; Monthly and Analytics = this month up to today |
 | D4 | Custom categories | Create only (no rename/delete) |
-| D5 | Overlap / midnight | Overlapping activities allowed; an activity can't cross midnight — **superseded by §4** (cross-midnight fix, v2 slice 1, not built yet) |
+| D5 | Overlap / midnight | Overlapping activities allowed; an activity can't cross midnight — **superseded by §4**: cross-midnight activities are supported since v2 slice 1 (2026-10-03), stored as two per-day rows linked by `spanId` |
 | D6 | Default categories | Work, Study, Exercise, Entertainment (no "Other") |
 | D7 | Demo data | Seeded with `demo-` ids and counted in Insights while present (banner shown); "Clear & start fresh" deletes only demo rows |
 
@@ -132,5 +132,5 @@ categories) shipped on 2026-10-01 via `plans/2026-09-26-add-activity.html`. Know
 time slot only.
 
 Section 4 is being delivered one slice at a time through the Plan → Implement → Test workflow
-(see `CLAUDE.md`). As of 2026-10-01 none of it is built: slice 1 (cross-midnight) is planned and
-unblocked; D-A (login) is resolved by ADR-007 (Firebase, F1–F3); D-B (goal ↔ category mapping) is still open.
+(see `CLAUDE.md`). Slice 1 (cross-midnight bug fix) shipped 2026-10-03; F1 (Firebase Hosting) is live at
+https://student-day-tracker.web.app; D-A (login) is resolved by ADR-007 (Firebase, F1–F3); D-B (goal ↔ category mapping) is still open.
