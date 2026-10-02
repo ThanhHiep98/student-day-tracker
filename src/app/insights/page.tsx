@@ -2,7 +2,6 @@
 
 import { ActivityAnalyticsPanel } from '@/components/activity-analytics-panel';
 import { ComparePanel } from '@/components/compare-panel';
-import { DemoBanner } from '@/components/demo-banner';
 import { InsightCards } from '@/components/insight-cards';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { MonthlyOverviewCard } from '@/components/monthly-overview-card';
@@ -15,17 +14,15 @@ import { filterByDateRange, getWeeklySummary } from '@/lib/get-weekly-summary';
 import { addDays, startOfMonth, startOfWeek, toIsoDate } from '@/lib/iso-date';
 import { useActivitiesRange } from '@/lib/use-activities-range';
 import { useCategories } from '@/lib/use-categories';
-import { useDemoData } from '@/lib/use-demo-data';
 import { useMemo, useState } from 'react';
 
 /**
  * Insights — req. 3: turn raw totals into narrative ("Bạn đang dành thời
- * gian cho điều gì?", not just "Work = 20h"). One live Dexie range query
+ * gian cho điều gì?", not just "Work = 20h"). One live Firestore range query
  * covers last week's comparison span and this month; each section is then
  * derived by a pure helper. Weeks are Mon–Sun, months are calendar months.
  */
 export default function InsightsPage() {
-  const { isDemo, clearDemo } = useDemoData();
   const categories = useCategories();
   const [selectedActivity, setSelectedActivity] = useState<string | null>(null);
 
@@ -58,8 +55,6 @@ export default function InsightsPage() {
           Not just totals — what you&apos;re actually spending your time on.
         </p>
       </header>
-
-      {isDemo && <DemoBanner onClear={clearDemo} />}
 
       {derived === undefined || categories === undefined ? (
         <LoadingSkeleton />

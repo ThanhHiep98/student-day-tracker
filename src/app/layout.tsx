@@ -1,5 +1,4 @@
-import { NavBar } from '@/components/nav-bar';
-import { SidebarNav } from '@/components/sidebar-nav';
+import { AuthGate } from '@/components/auth-gate';
 import { themeInitScript } from '@/lib/theme-init-script';
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
@@ -18,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Student Day Tracker',
   description:
-    'Offline-first daily activity tracker for students — timeline, calendar history, and insights. Installable PWA, works without a network.',
+    'Daily activity tracker for students — timeline, calendar history, and insights. Sign in with Google to sync across devices; works offline. Installable PWA.',
   applicationName: 'Student Day Tracker',
   appleWebApp: {
     capable: true,
@@ -43,13 +42,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-full">
         {/* biome-ignore lint/security/noDangerouslySetInnerHtml: inline script is required to run before hydration to prevent theme FOUC */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        <div className="flex min-h-full">
-          <SidebarNav />
-          <div className="flex min-h-full flex-1 flex-col">
-            {children}
-            <NavBar />
-          </div>
-        </div>
+        <AuthGate>{children}</AuthGate>
       </body>
     </html>
   );

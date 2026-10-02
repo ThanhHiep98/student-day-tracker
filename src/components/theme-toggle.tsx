@@ -1,35 +1,51 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useTheme } from '@/lib/use-theme';
 
-type Theme = 'light' | 'dark';
+interface ThemeToggleProps {
+  /** `icon`: moon/sun button (headers). `switch`: "Dark mode" row with a switch (mobile account sheet ⑧). */
+  variant?: 'icon' | 'switch';
+  className?: string;
+}
 
-export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('light');
-  const [mounted, setMounted] = useState(false);
+export function ThemeToggle({ variant = 'icon', className = '' }: ThemeToggleProps) {
+  const { theme, mounted, toggle } = useTheme();
+  const dark = theme === 'dark';
 
-  useEffect(() => {
-    setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-    setMounted(true);
-  }, []);
-
-  function toggle() {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.classList.toggle('dark', next === 'dark');
-    try {
-      localStorage.setItem('theme', next);
-    } catch {}
-    setTheme(next);
+  if (variant === 'switch') {
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={dark}
+        onClick={toggle}
+        className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg px-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100 ${className}`}
+      >
+        <span>Dark mode</span>
+        <span
+          aria-hidden
+          className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors motion-reduce:transition-none ${
+            dark ? 'border-indigo-500 bg-indigo-500' : 'border-border bg-surface-muted'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 size-5.5 rounded-full bg-white shadow transition-transform motion-reduce:transition-none ${
+              dark ? 'translate-x-5.5' : 'translate-x-0.5'
+            }`}
+          />
+        </span>
+      </button>
+    );
   }
 
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="flex size-9 shrink-0 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:focus-visible:outline-zinc-100"
+      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className={`flex size-9 shrink-0 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:focus-visible:outline-zinc-100 ${className}`}
     >
-      {!mounted ? null : theme === 'dark' ? (
+      {!mounted ? null : dark ? (
         <svg
           viewBox="0 0 20 20"
           aria-hidden

@@ -7,7 +7,7 @@ interface EmptyStateProps {
 
 export function EmptyState({
   title = 'No activities yet today',
-  description = "Add your first activity to start today's timeline. Everything stays on this device — no account, no sync.",
+  description = "Add your first activity to start today's timeline. It's saved to your account and works offline, too.",
   headingLevel: Heading = 'h2',
 }: EmptyStateProps) {
   return (
