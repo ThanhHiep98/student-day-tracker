@@ -5,9 +5,8 @@ export const metadata: Metadata = {
   title: 'Thông báo về quyền riêng tư · Student Day Tracker',
 };
 
-// Contact channel for data requests. DRAFT (plan §2.2 Q1): the owner reviews
-// this whole notice — including this contact — before F2 is merged.
-const CONTACT_URL = 'https://github.com/ThanhHiep98/student-day-tracker/issues';
+// Contact channel for data requests (plan §2.2 Q1, reviewed by the owner 2026-10-04).
+const CONTACT_EMAIL = 'hotrohs12thpt@gmail.com';
 
 /**
  * Privacy notice (plan §1.3 phase 3, Nghị định 13/2023/NĐ-CP). Static; readable
@@ -117,14 +116,14 @@ export default function PrivacyPage() {
           <h2 className="font-semibold">8. Quyền của bạn</h2>
           <p className="mt-2 text-zinc-700 dark:text-zinc-300">
             Bạn có thể xem, sửa và xoá từng hoạt động ngay trong ứng dụng. Để yêu cầu xoá toàn bộ
-            tài khoản và dữ liệu, hoặc rút lại sự đồng ý, hãy gửi yêu cầu cho chúng tôi qua{' '}
+            tài khoản và dữ liệu, hoặc rút lại sự đồng ý, hãy gửi email cho chúng tôi tại{' '}
             <a
-              href={CONTACT_URL}
+              href={`mailto:${CONTACT_EMAIL}`}
               className="text-indigo-700 underline underline-offset-2 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-indigo-200"
             >
-              trang dự án
+              {CONTACT_EMAIL}
             </a>
-            ; chúng tôi sẽ xử lý trong vòng 72 giờ.
+            ; chúng tôi sẽ xử lý trong vòng 7 ngày.
           </p>
         </section>
       </article>
