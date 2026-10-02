@@ -62,10 +62,24 @@ interface Activity {
   categoryId: string;
   name: string;
   date: string;          // YYYY-MM-DD, indexed for Home/History/Insights lookups
-  startMinutes: number;  // minutes since midnight
-  endMinutes: number;
+  startMinutes: number;  // minutes since midnight, 0-1439
+  endMinutes: number;    // end-exclusive, 1-1440 (1440 = "ends at midnight")
+  spanId?: string;       // set on both rows of a cross-midnight activity (= head row id)
+  createdAt: number;
 }
 ```
+
+**Cross-midnight activities** (v2 slice 1, `plans/2026-10-01-v2-roadmap-cross-midnight.html`)
+are stored as two per-day rows: a head `start–1440` on the start date and a tail `0–end` on the
+next day, both with `spanId` = the head's `id`; the tail's id is `${headId}-next` (so demo spans
+keep the `demo-` prefix). Every row still lives on one `date`, so the daily/weekly/monthly
+helpers and History lookups are unchanged and each day counts only its own minutes. Edit and
+delete load the span via the `spanId` index and act on both rows in one `rw` transaction
+(`lib/activity-writes.ts`). Session counts (Activity Analytics, Monthly "most common", the
+routine card) count distinct `spanId ?? id` (`lib/activity-span.ts`).
+
+**Schema versions:** `version(1)` is the original schema; `version(2)` only adds the `spanId`
+index on `activities` (no upgrade function). Versions are additive — never edit an old block.
 
 Two layers sit on top:
 
@@ -143,7 +157,7 @@ No state library.
 | Layer | Tool | What we test |
 |-------|------|--------------|
 | Unit | Vitest | Pure helpers (`getDailySummary`, `buildMonthGrid`, `formatMinutes`) on plain arrays |
-| Integration | Vitest + `fake-indexeddb` | Dexie schema, indexes, and the default-category seed |
+| Integration | Vitest + `fake-indexeddb` | Dexie schema, indexes, the default-category seed, the v1 → v2 upgrade, and span edit/delete transactions |
 | E2E | Playwright | Route rendering, nav between Home/History/Insights, calendar day selection |
 | Accessibility | `@axe-core/playwright` | Zero violations on all three routes |
 | Hosting | Playwright + Firebase Hosting emulator (`pnpm test:e2e:hosting`) | `firebase.json` routes, redirects, 404, cache headers, manifest scope |
@@ -178,6 +192,8 @@ adding them is the Implement/Test agents' job, guided by the plan the Plan agent
   are calendar months; Compare is week-to-date vs. the same weekdays last week.
 - **Demo data:** seeded rows use a `demo-` id prefix; "Clear & start fresh" (Home and Insights)
   deletes only `demo-*` rows plus any legacy ids from the old `sdt-demo-activity-ids` key.
-- **Deferred:** renaming/deleting custom categories, editing from History, overlap detection,
-  activities that cross midnight, changing an activity's date. No Dexie schema version bump was
-  needed.
+- **v2 slice 1 — cross-midnight (built):** the Add/Edit form has a "Start date" field; an end
+  time earlier than the start means "ends next day" and is stored as a two-row span (see Data
+  layer). Editing can change an activity's date. Start = end is rejected. Dexie `version(2)` adds
+  the `spanId` index.
+- **Deferred:** renaming/deleting custom categories, editing from History, overlap detection.
