@@ -21,8 +21,8 @@ https://student-day-tracker.web.app.
   (`requirement/Requirement.txt`, `docs/REQUIREMENTS.md` §4) per
   `plans/2026-10-01-v2-roadmap-cross-midnight.html`: slice 1 (cross-midnight) and F1 (Firebase
   Hosting + CI) shipped 2026-10-03; **F2 (Google sign-in, Firestore data layer, one-time Dexie
-  migration, Security Rules; demo mode retired)** built on `feat/f2-auth-firestore`, live after
-  merge + rules deploy. Next: slice 2 onboarding (ADR-008, accepted); slices 3/4/5/8 + F3 designed
+  migration, Security Rules; demo mode retired)** live 2026-10-04; **slice 2 onboarding (ADR-008)**
+  built on `feat/slice2-onboarding`, live after rules deploy + merge; slices 3/4/5/8 + F3 designed
   in ADR-009 (in review, GitHub issue #3). Details in `docs/ARCHITECTURE.md` → "Status".
 
 ## Tech stack
@@ -114,6 +114,13 @@ planning. Keep entries terse; don't restate what's already here.)*
   custom categories are stored. Emulator-only test hooks (`window.__sdtTest`) sit behind
   `NEXT_PUBLIC_FIREBASE_EMULATORS === '1'` and must not appear in `out/`. See
   `plans/2026-10-01-v2-roadmap-cross-midnight.html` §2.
+- **Full-page UI requested from inside a page** (e.g. "Re-run questionnaire" on `/goals`) goes
+  through a module-level request store (`use-onboarding-wizard.ts`, same pattern as
+  `use-sync-status.ts`) that the app shell reads — don't lift that state through every page.
+- **Always-on side-effect components in `auth-gate.tsx`** (e.g. `FirstRunTasks`) sit outside the
+  conditional branches, so switching branches (wizard ↔ app shell) never remounts them mid-flight.
+- **Form sections shared by a wizard and a settings page** take a `compact?: boolean` prop that
+  drops the wizard-only heading/description — don't fork the component.
 - **No real Firebase credentials in tests:** emulators run with a `demo-*` project id
   (`demo-sdt`), the AI client is injected and mocked; only deploy jobs use the
   `FIREBASE_SERVICE_ACCOUNT_*` secret. The web `firebaseConfig` is public and committed; never
