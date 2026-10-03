@@ -8,8 +8,10 @@ import {
 import { addDays } from './iso-date';
 import type { Activity, HabitGoals, IsoDate } from './types';
 
-/** Canonical goal order, matching `HabitGoals` and `evaluateDay`'s findings. */
-const GOAL_ORDER: GoalKey[] = [
+/** Canonical goal order, matching `HabitGoals` and `evaluateDay`'s findings.
+ * Exported so slice 5's `getWeekEfficiency` (get-efficiency.ts) can build its
+ * six per-goal bars in the same order without redeclaring the list. */
+export const GOAL_ORDER: GoalKey[] = [
   'sleep',
   'school',
   'extraClass',

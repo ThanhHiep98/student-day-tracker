@@ -262,12 +262,12 @@ No state library.
 
 | Layer | Tool | What we test |
 |-------|------|--------------|
-| Unit | Vitest (`pnpm test`) | Pure helpers on plain arrays — summaries, builders (incl. name caps), `planDexieMigration` (0/500/501/600 ops, pairs at the boundary, skips, remaps, re-run = nothing), profile, given name, converters, sync status, `buildHabitGoals` (D6 boundaries), `getDayBudget`, `getWakeTime`, `suggestedHabitGoals`, default categories, `buildDayRating`/`isDayRatable` (D2 window, score/note boundaries), `getRatingTrend` (D7 untracked days excluded) |
+| Unit | Vitest (`pnpm test`) | Pure helpers on plain arrays — summaries, builders (incl. name caps), `planDexieMigration` (0/500/501/600 ops, pairs at the boundary, skips, remaps, re-run = nothing), profile, given name, converters, sync status, `buildHabitGoals` (D6 boundaries), `getDayBudget`, `getWakeTime`, `suggestedHabitGoals`, default categories, `buildDayRating`/`isDayRatable` (D2 window, score/note boundaries), `getRatingTrend` (D7 untracked days excluded), `getDayEfficiency`/`getWeekEfficiency` (D6 formula table incl. the cap formula, school-days-only, rounding, "No cap set" vs. "Not tracked yet"), `use-welcome-back-dialog`'s per-uid/date eligibility |
 | Integration (Dexie) | Vitest + `fake-indexeddb` | The frozen migration source: schema, seed (still only the original four categories), indexes, v1 → v2 upgrade |
 | Rules | `@firebase/rules-unit-testing` on the Firestore emulator (`pnpm test:emulator`) | Owner-only access on all five paths; malformed profiles/activities/categories/habit goals/day ratings rejected |
 | Integration (Firestore) | Real SDK on the Auth/Firestore emulators (`pnpm test:emulator`) | Writes at the §2.4 paths, span batches, range query, two devices on one account, migration (600 rows, progress, markers last, re-run, second account, failure), `saveHabitGoals` round-trip, `saveDayRating` round-trip + `documentId()` range query |
-| E2E | Playwright + emulators (`pnpm test:e2e`) | Auth gate on every route, real popup sign-in creates the profile, migration dialog, offline add + sync, sign out clears the cache, Home/History/Insights flows after sign-in, onboarding wizard (walk all steps, skip/resume, offline save, Habits & goals edits, Re-run), daily rating (tap saves + reload, note Save, History shows it, Insights trend + average) |
-| Accessibility | `@axe-core/playwright` | Zero violations on ①–④, ⑥, ⑧, `/privacy/`, all signed-in routes/dialogs, the onboarding wizard/banner/Habits & goals page, and Home/History/Insights with a day rated |
+| E2E | Playwright + emulators (`pnpm test:e2e`) | Auth gate on every route, real popup sign-in creates the profile, migration dialog, offline add + sync, sign out clears the cache, Home/History/Insights flows after sign-in, onboarding wizard (walk all steps, skip/resume, offline save, Habits & goals edits, Re-run), daily rating (tap saves + reload, note Save, History shows it, Insights trend + average), welcome-back dialog once-per-day (incl. staying closed across a reload without clicking "Start today") + "Rate yesterday", Insights % hiệu quả section (populated and "–" empty state) |
+| Accessibility | `@axe-core/playwright` | Zero violations on ①–④, ⑥, ⑧, `/privacy/`, all signed-in routes/dialogs, the onboarding wizard/banner/Habits & goals page, Home/History/Insights with a day rated, the welcome-back dialog (desktop + mobile, incl. the revealed rating card) and the Insights efficiency section |
 | Hosting | Playwright + Firebase Hosting emulator (`pnpm test:e2e:hosting`) | `firebase.json` routes (sign-in screen signed out), redirects, 404, cache headers, manifest scope |
 | Lighthouse | Local, on demand | Spot-check; no CI gate |
 
@@ -343,3 +343,26 @@ adding them is the Implement/Test agents' job, guided by the plan the Plan agent
   render nothing before it's completed (the existing onboarding banner already covers that
   prompt). No new Firestore paths or Security Rules — read-only over existing data. Feeds slice 5's
   `getEfficiency` and slice 8's `buildDaySummary`, which reuse `evaluateDay`/`evaluateWeek`.
+- **v2 slice 5 — % hiệu quả vs. baseline (built; `architecture/ADR-009-daily-feedback-and-parent-view.md`
+  §1.2 ④⑤/§2.2 D6-D8):** `getDayEfficiency(evaluation)` / `getWeekEfficiency(week)`
+  (`src/lib/get-efficiency.ts`) turn `evaluateDay`/`evaluateWeek`'s per-goal findings into D6's 0-1
+  scores — target goals `min(actual/target, 1)` (a `target` of exactly 0 trivially scores 1); school
+  = minutes logged inside its blocks ÷ planned, school days only; entertainment (a cap, not a
+  target) `1` at/under the cap else `max(0, 1 - (actual-cap)/cap)` — and average them into a 0-100
+  day/week percent, excluding a goal with nothing to score against (entertainment's "no limit") and
+  untracked/not-yet-ended days (D7) from every average. Table-tested, including the cap formula,
+  school-days-only, rounding, and the "No cap set" vs. "Not tracked yet" distinction for a goal with
+  no data yet. `evaluate-day.ts` also gained `goalCategoryId(goals, key)` so the UI can color each
+  goal by its own category instead of a new hardcoded color.
+  `WelcomeBackDialog` (native `<dialog>`, same focus-trap/Esc pattern as `ConfirmDialog`) shows once
+  per calendar day on the first Home load (`use-welcome-back-dialog.ts`'s `localStorage` flag,
+  keyed per uid+date, documented there) for **yesterday**, only when yesterday has activities (D8):
+  a `%` ring, per-goal bars, an "Up/Down from X% the day before" line when the day before also has
+  data, one comment line reused from slice 4's `buildRuleComments` (labelled "Rule-based" — the
+  Gemini badge is F3, not built), and "Rate yesterday" which reveals the existing `DayRatingCard`
+  for that date inline rather than navigating away. Insights gained "% hiệu quả · this week"
+  (`EfficiencySection`, above "Comments on your week" and "How your days felt"): a week-average
+  ring, Mon-Sun daily bars ("–" for untracked/not-yet-ended days), and the six per-goal bars with a
+  short note each. No new Firestore paths or Security Rules — read-only over existing data (goals,
+  activities, the signed-in user's own day ratings). AI comments, daily summaries, the parent view
+  and the role choice are still F3/slice 8.

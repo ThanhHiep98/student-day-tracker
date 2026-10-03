@@ -14,6 +14,7 @@ import { PlanStatusCard } from '@/components/plan-status-card';
 import { RecentActivityRail } from '@/components/recent-activity-rail';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TipCard } from '@/components/tip-card';
+import { WelcomeBackDialog } from '@/components/welcome-back-dialog';
 import { mergeActivitySpan } from '@/lib/activity-span';
 import {
   addActivityRows,
@@ -23,12 +24,15 @@ import {
 } from '@/lib/activity-writes';
 import { buildActivity } from '@/lib/build-activity';
 import { buildCategory } from '@/lib/build-category';
+import { buildRuleComments } from '@/lib/build-rule-comments';
 import { addCategory } from '@/lib/category-writes';
 import { DEFAULT_CATEGORIES } from '@/lib/default-categories';
 import { evaluateDay } from '@/lib/evaluate-day';
+import { evaluateWeek } from '@/lib/evaluate-week';
 import { getDailySummary } from '@/lib/get-daily-summary';
+import { getDayEfficiency } from '@/lib/get-efficiency';
 import { getGivenName } from '@/lib/get-given-name';
-import { addDays, toIsoDate } from '@/lib/iso-date';
+import { addDays, startOfWeek, toIsoDate } from '@/lib/iso-date';
 import type { Activity, Category } from '@/lib/types';
 import { useActivities } from '@/lib/use-activities';
 import { useActivitiesRange } from '@/lib/use-activities-range';
@@ -37,7 +41,8 @@ import { useCategories } from '@/lib/use-categories';
 import { useDayRating } from '@/lib/use-day-rating';
 import { useHabitGoals } from '@/lib/use-habit-goals';
 import { useInstallPrompt } from '@/lib/use-install-prompt';
-import { useState } from 'react';
+import { markWelcomeBackShown, useWelcomeBackEligibility } from '@/lib/use-welcome-back-dialog';
+import { useEffect, useState } from 'react';
 
 const GREETING_BY_HOUR = (hour: number) => {
   if (hour < 12) return 'Good morning';
@@ -65,10 +70,19 @@ type FormState =
  */
 export default function Home() {
   const today = toIsoDate(new Date());
+  const yesterday = addDays(today, -1);
+  const dayBeforeYesterday = addDays(today, -2);
   const activities = useActivities(today);
   // Covers the day before too: a cross-midnight sleep span ending today has
   // its bedtime row on yesterday (evaluate-day.ts).
   const planActivities = useActivitiesRange(addDays(today, -1), today);
+  // ADR-009 §1.2 ④ welcome-back dialog: one range covers yesterday, the day
+  // before it (for the comparison line, including its own sleep-span day
+  // before that) and the whole week around yesterday (for the week's
+  // rule-based comment, slice 4's buildRuleComments).
+  const wbWeekStart = startOfWeek(yesterday);
+  const wbActivities = useActivitiesRange(addDays(wbWeekStart, -1), addDays(wbWeekStart, 6));
+  const yesterdayRating = useDayRating(yesterday);
   const categories = useCategories();
   const habitGoals = useHabitGoals();
   const todayRating = useDayRating(today);
@@ -81,6 +95,11 @@ export default function Home() {
 
   const [formState, setFormState] = useState<FormState>({ open: false });
   const [confirmDelete, setConfirmDelete] = useState<Activity | null>(null);
+  // The date (if any) the student already closed today's dialog for — keyed
+  // by date rather than a plain boolean so a new calendar day (D8) is
+  // eligible again without a separate reset effect.
+  const [welcomeBackDismissedFor, setWelcomeBackDismissedFor] = useState<string | null>(null);
+  const welcomeBackEligible = useWelcomeBackEligibility(scope?.uid ?? null, today);
 
   const now = new Date();
   const dateLabel = now.toLocaleDateString(undefined, {
@@ -94,6 +113,39 @@ export default function Home() {
     planActivities && habitGoals && habitGoals.status === 'completed'
       ? evaluateDay(planActivities, habitGoals, today, now)
       : undefined;
+
+  // ADR-009 §1.2 ④: yesterday's % hiệu quả, the day before's (for the
+  // comparison line) and the week's rule-based comment, all from one range
+  // query (`wbActivities`).
+  const goalsReady = habitGoals && habitGoals.status === 'completed' ? habitGoals : undefined;
+  const yesterdayEvaluation =
+    wbActivities && goalsReady ? evaluateDay(wbActivities, goalsReady, yesterday, now) : undefined;
+  const dayBeforeEvaluation =
+    wbActivities && goalsReady
+      ? evaluateDay(wbActivities, goalsReady, dayBeforeYesterday, now)
+      : undefined;
+  const yesterdayEfficiency = yesterdayEvaluation
+    ? getDayEfficiency(yesterdayEvaluation)
+    : undefined;
+  const dayBeforeEfficiency = dayBeforeEvaluation
+    ? getDayEfficiency(dayBeforeEvaluation)
+    : undefined;
+  const welcomeBackComment =
+    wbActivities && goalsReady
+      ? (buildRuleComments(evaluateWeek(wbActivities, goalsReady, wbWeekStart, now))[0] ?? null)
+      : null;
+  const hasYesterdayData = (yesterdayEvaluation?.totalTrackedMinutes ?? 0) > 0;
+  const welcomeBackOpen =
+    welcomeBackEligible &&
+    hasYesterdayData &&
+    welcomeBackDismissedFor !== today &&
+    yesterdayEfficiency !== undefined;
+
+  // D8: mark the flag the moment the dialog becomes eligible to show, not
+  // only when the student closes it — a reload later today must not reopen it.
+  useEffect(() => {
+    if (welcomeBackOpen && scope) markWelcomeBackShown(scope.uid, today);
+  }, [welcomeBackOpen, scope, today]);
 
   // The auth gate only renders pages once signed in, so `scope` is set here.
   function requireScope() {
@@ -233,6 +285,22 @@ export default function Home() {
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setConfirmDelete(null)}
       />
+
+      {yesterdayEfficiency && goalsReady && (
+        <WelcomeBackDialog
+          open={welcomeBackOpen}
+          onClose={() => setWelcomeBackDismissedFor(today)}
+          date={yesterday}
+          today={today}
+          efficiency={yesterdayEfficiency}
+          dayBeforePercent={dayBeforeEfficiency?.percent ?? null}
+          comment={welcomeBackComment}
+          categories={formCategories}
+          habitGoals={goalsReady}
+          rating={yesterdayRating}
+          scope={scope}
+        />
+      )}
     </main>
   );
 }
