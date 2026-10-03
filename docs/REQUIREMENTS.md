@@ -145,5 +145,11 @@ quả, AI comments and the parent view are the rest of ADR-009, still to come): 
 day?" card on Home (5-emoji scale + optional note ≤ 280 chars, editable for today and the previous
 7 days), the same card read-only/editable on History for the selected day, and a "How your days
 felt" weekly trend on Insights — `users/{uid}/dayRatings/{date}`, `buildDayRating`,
-`getRatingTrend`. Still to come: the warnings/nhận xét and % hiệu quả lines ("sẽ đưa ra cảnh báo…",
-"tính % hiệu quả…") — slices 4–5. The sticker/nhãn dán request and parent view are also ADR-009.
+`getRatingTrend`. Slice 4 — "… đưa ra cảnh báo nếu activity của User đang vi phạm. Đưa ra nhận xét
+cho người dùng." — built on `feat/slice4-warnings-comments` via ADR-009 §1.2 ①②⑥/§2, D3-D5: a
+"Today vs your plan" card on Home shows each goal's status against `users/{uid}/goals/habits`
+(icon + text, never colour alone; caps and the bedtime nudge warn live, other targets show "to go"
+mid-day and a warning only once the day ends), and a "Comments on your week" card on Insights shows
+up to three neutral, specific-numbers sentences — `evaluateDay`, `evaluateWeek`, `buildRuleComments`.
+Still to come: the % hiệu quả line ("tính % hiệu quả…") and AI comments — slice 5 and F3. The
+sticker/nhãn dán request and parent view are also ADR-009 (slices 6 and 8).
