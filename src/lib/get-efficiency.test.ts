@@ -284,4 +284,28 @@ describe('getWeekEfficiency — six per-goal bars with short notes', () => {
     const selfStudy = getWeekEfficiency(week).goals.find((g) => g.key === 'selfStudy');
     expect(selfStudy).toMatchObject({ percent: null, note: 'Not tracked yet' });
   });
+
+  it('notes a goal that never applies this week (school with no school days) the same neutral way', () => {
+    const noSchoolDays: HabitGoals = { ...GOALS, school: { ...GOALS.school, days: [] } };
+    const activities = WEEKDAYS.flatMap((date) => [
+      activity({ categoryId: 'self-study', date, startMinutes: 0, endMinutes: 180 }),
+    ]);
+    const week = evaluateWeek(activities, noSchoolDays, WEEK_START, AFTER_WEEK);
+    const school = getWeekEfficiency(week).goals.find((g) => g.key === 'school');
+    expect(school).toMatchObject({ percent: null, note: 'Not tracked yet' });
+  });
+
+  it('still notes "No cap set" for entertainment with no limit even when the week has tracked days', () => {
+    const noCapGoals: HabitGoals = {
+      ...GOALS,
+      entertainment: { maxMinutesPerDay: null, categoryId: 'entertainment' },
+    };
+    const activities = WEEKDAYS.flatMap((date) => [
+      activity({ categoryId: 'self-study', date, startMinutes: 0, endMinutes: 180 }),
+      activity({ categoryId: 'entertainment', date, startMinutes: 200, endMinutes: 260 }),
+    ]);
+    const week = evaluateWeek(activities, noCapGoals, WEEK_START, AFTER_WEEK);
+    const entertainment = getWeekEfficiency(week).goals.find((g) => g.key === 'entertainment');
+    expect(entertainment).toMatchObject({ percent: null, note: 'No cap set' });
+  });
 });

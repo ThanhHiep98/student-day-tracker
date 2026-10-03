@@ -109,13 +109,25 @@ export function getDayEfficiency(evaluation: DayEvaluation): DayEfficiency {
   return { date: evaluation.date, percent, goals };
 }
 
+/**
+ * `anyTargetMinutes` comes from *any* day's finding for this goal this week —
+ * including untracked ones, since `evaluateDay` always evaluates a goal's
+ * config (target/cap) regardless of whether anything was logged. `undefined`
+ * means the goal never applied any day this week (e.g. school on a week with
+ * no school days); `null` means it applies but has no cap configured
+ * (entertainment's "no limit", D6) — distinct from simply having no tracked
+ * data yet, which also leaves `percent` `null` but shouldn't say "No cap set"
+ * when a cap *is* configured.
+ */
 function noteFor(
-  key: GoalKey,
   isCap: boolean,
   percent: number | null,
-  relevant: GoalEfficiency[]
+  relevant: GoalEfficiency[],
+  anyTargetMinutes: number | null | undefined
 ): string {
-  if (percent === null) return isCap ? 'No cap set' : 'Not tracked yet';
+  if (percent === null) {
+    return anyTargetMinutes === null ? 'No cap set' : 'Not tracked yet';
+  }
   if (isCap) {
     const overDays = relevant.filter((g) => g.score !== null && g.score < 1).length;
     return overDays > 0 ? `Over cap on ${overDays} of ${relevant.length} days` : 'Within cap';
@@ -159,6 +171,9 @@ export function getWeekEfficiency(week: WeekEvaluation): WeekEfficiency {
       relevant.length > 0
         ? Math.round((relevant.reduce((sum, g) => sum + (g.score ?? 0), 0) / relevant.length) * 100)
         : null;
+    const anyTargetMinutes = perDay
+      .map((d) => d.day.findings.find((f) => f.key === key))
+      .find((f): f is GoalFinding => f !== undefined)?.targetMinutes;
 
     return {
       key,
@@ -166,7 +181,7 @@ export function getWeekEfficiency(week: WeekEvaluation): WeekEfficiency {
       icon: meta.icon,
       isCap,
       percent,
-      note: noteFor(key, isCap, percent, relevant),
+      note: noteFor(isCap, percent, relevant, anyTargetMinutes),
     };
   });
 
