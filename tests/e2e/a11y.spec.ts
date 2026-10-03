@@ -1,7 +1,13 @@
 import AxeBuilder from '@axe-core/playwright';
 import { type Page, type Route, expect, test } from '@playwright/test';
 import type { Activity } from '../../src/lib/types';
-import { openSignedIn, seedActivities, seedDexie, signInAs } from './support/emulator';
+import {
+  openSignedIn,
+  seedActivities,
+  seedDayRatings,
+  seedDexie,
+  signInAs,
+} from './support/emulator';
 import { buildSampleWeek } from './support/sample-week';
 
 const welcome = (page: Page) => page.getByRole('heading', { name: /Let's set up your day/ });
@@ -130,6 +136,42 @@ test.describe('signed in', () => {
     await expect(
       page.getByRole('heading', { name: 'Nothing tracked this week yet' })
     ).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('Home has no accessibility violations once today is rated with a note (ADR-009 ①③)', async ({
+    page,
+  }) => {
+    await openSignedIn(page);
+    const card = page.getByRole('region', { name: 'How was your day?' });
+    await card.getByRole('button', { name: '4 of 5' }).click();
+    await card.getByLabel('Optional note').fill('Kiểm tra Toán ổn, nhưng thức khuya quá.');
+    await expectNoViolations(page);
+  });
+
+  test('History has no accessibility violations with a rated day', async ({ page }) => {
+    const user = await openSignedIn(page);
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await seedDayRatings(user.uid, [{ date: today, rating: { score: 3, updatedAt: Date.now() } }]);
+    await page.getByRole('link', { name: 'History' }).click();
+    await expect(page.getByRole('region', { name: 'How was your day?' })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('/insights/ has no accessibility violations with "How your days felt" rated (ADR-009 ⑤)', async ({
+    page,
+  }) => {
+    const user = await openSignedIn(page);
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await seedDayRatings(user.uid, [{ date: today, rating: { score: 5, updatedAt: Date.now() } }]);
+    await page.getByRole('link', { name: 'Insights' }).click();
+    await expect(page.getByRole('region', { name: 'How your days felt' })).toBeVisible();
     await expectNoViolations(page);
   });
 });

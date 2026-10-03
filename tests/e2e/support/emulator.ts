@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type Page, expect } from '@playwright/test';
 import type { SdtTestHooks } from '../../../src/lib/firebase-test-hooks';
-import type { Activity, Category } from '../../../src/lib/types';
+import type { Activity, Category, DayRating, IsoDate } from '../../../src/lib/types';
 
 /**
  * E2E helpers for the Auth + Firestore emulators (plan §2.5 phase 3 Tests).
@@ -120,6 +120,20 @@ export async function seedActivities(uid: string, rows: Activity[]): Promise<voi
     await commit(
       rows.slice(i, i + 400).map((row) => ({
         update: { name: docName(`users/${uid}/activities/${row.id}`), fields: fields(row) },
+      }))
+    );
+  }
+}
+
+/** Write day ratings straight to users/{uid}/dayRatings/{date} on the emulator. */
+export async function seedDayRatings(
+  uid: string,
+  rows: { date: IsoDate; rating: DayRating }[]
+): Promise<void> {
+  for (let i = 0; i < rows.length; i += 400) {
+    await commit(
+      rows.slice(i, i + 400).map(({ date, rating }) => ({
+        update: { name: docName(`users/${uid}/dayRatings/${date}`), fields: fields(rating) },
       }))
     );
   }

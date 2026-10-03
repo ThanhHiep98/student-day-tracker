@@ -2,12 +2,15 @@
 
 import { ActivityTimeline } from '@/components/activity-timeline';
 import { DailySummaryCard } from '@/components/daily-summary-card';
+import { DayRatingCard } from '@/components/day-rating-card';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { buildMonthGrid } from '@/lib/build-month-grid';
 import { getDailySummary } from '@/lib/get-daily-summary';
 import { toIsoDate } from '@/lib/iso-date';
 import { useActivities } from '@/lib/use-activities';
+import { useAuth } from '@/lib/use-auth';
 import { useCategories } from '@/lib/use-categories';
+import { useDayRating } from '@/lib/use-day-rating';
 import { useMemo, useState } from 'react';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -20,9 +23,10 @@ const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
  * through the same live hooks as Home.
  */
 export default function HistoryPage() {
-  const today = new Date();
-  const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
-  const [selectedDate, setSelectedDate] = useState(toIsoDate(today));
+  const now = new Date();
+  const today = toIsoDate(now);
+  const [cursor, setCursor] = useState({ year: now.getFullYear(), month: now.getMonth() });
+  const [selectedDate, setSelectedDate] = useState(today);
 
   const grid = useMemo(() => buildMonthGrid(cursor.year, cursor.month), [cursor]);
   const monthLabel = useMemo(
@@ -37,6 +41,8 @@ export default function HistoryPage() {
   const activities = useActivities(selectedDate);
   const categories = useCategories();
   const summary = activities && categories ? getDailySummary(activities, categories) : undefined;
+  const { scope } = useAuth();
+  const rating = useDayRating(selectedDate);
 
   function changeMonth(delta: number) {
     setCursor(({ year, month }) => {
@@ -87,7 +93,7 @@ export default function HistoryPage() {
             // biome-ignore lint/suspicious/noArrayIndexKey: blank calendar cells have no natural id; position is stable within a single month grid render
             if (!date) return <span key={`blank-${i}`} aria-hidden />;
             const isSelected = date === selectedDate;
-            const isToday = date === toIsoDate(today);
+            const isToday = date === today;
             return (
               <button
                 key={date}
@@ -120,10 +126,11 @@ export default function HistoryPage() {
             day: 'numeric',
           })}
         </h2>
-        {activities === undefined || categories === undefined ? (
+        {activities === undefined || categories === undefined || rating === undefined ? (
           <LoadingSkeleton />
         ) : (
           <>
+            <DayRatingCard date={selectedDate} today={today} rating={rating} scope={scope} />
             <DailySummaryCard
               totalMinutes={summary?.totalMinutes ?? 0}
               byCategory={summary?.byCategory ?? []}

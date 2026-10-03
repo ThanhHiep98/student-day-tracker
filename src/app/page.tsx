@@ -6,6 +6,7 @@ import { AddActivityForm, type AddActivityFormValues } from '@/components/add-ac
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { DailyDonutChart } from '@/components/daily-donut-chart';
 import { DailySummaryCard } from '@/components/daily-summary-card';
+import { DayRatingCard } from '@/components/day-rating-card';
 import { InstallBanner } from '@/components/install-banner';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { OnboardingBanner } from '@/components/onboarding-banner';
@@ -30,6 +31,7 @@ import type { Activity, Category } from '@/lib/types';
 import { useActivities } from '@/lib/use-activities';
 import { useAuth } from '@/lib/use-auth';
 import { useCategories } from '@/lib/use-categories';
+import { useDayRating } from '@/lib/use-day-rating';
 import { useHabitGoals } from '@/lib/use-habit-goals';
 import { useInstallPrompt } from '@/lib/use-install-prompt';
 import { useState } from 'react';
@@ -63,6 +65,7 @@ export default function Home() {
   const activities = useActivities(today);
   const categories = useCategories();
   const habitGoals = useHabitGoals();
+  const todayRating = useDayRating(today);
   const { canInstall, install, dismiss } = useInstallPrompt();
   const { user, scope } = useAuth();
   const givenName = user ? getGivenName(user.displayName, user.email) : null;
@@ -182,6 +185,9 @@ export default function Home() {
             />
           </div>
           <aside className="flex flex-col gap-4">
+            {todayRating !== undefined && (
+              <DayRatingCard date={today} today={today} rating={todayRating} scope={scope} />
+            )}
             <TipCard />
             <RecentActivityRail activities={activities} categories={categories} />
           </aside>
