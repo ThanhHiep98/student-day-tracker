@@ -205,6 +205,18 @@ function decode(raw: Record<string, object>): Record<string, unknown> {
   );
 }
 
+/** F3: force the next AI call(s) in this page to resolve with `text` instead of calling Gemini. */
+export async function setAiReply(page: Page, text: string): Promise<void> {
+  await waitForTestHooks(page);
+  await page.evaluate((t) => (window as HookWindow).__sdtTest?.setAiReply(t), text);
+}
+
+/** F3: force the next AI call(s) in this page to fail (offline/quota/model error). */
+export async function setAiError(page: Page): Promise<void> {
+  await waitForTestHooks(page);
+  await page.evaluate(() => (window as HookWindow).__sdtTest?.setAiError());
+}
+
 /** Seed the legacy Dexie database in the page (before the first sign-in). */
 export async function seedDexie(
   page: Page,

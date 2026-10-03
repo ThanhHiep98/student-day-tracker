@@ -117,6 +117,42 @@ describe('users/{uid} profile', () => {
     await assertFails(deleteDoc(doc(db, 'users/alice')));
   });
 
+  it('lets the owner set and withdraw aiConsent (F3, ADR-009 D10/D12)', async () => {
+    await seed('users/alice', profile);
+    const db = asUser('alice');
+    await assertSucceeds(
+      setDoc(doc(db, 'users/alice'), { aiConsent: { granted: true, at: 5 } }, { merge: true })
+    );
+    await assertSucceeds(
+      updateDoc(doc(db, 'users/alice'), { aiConsent: { granted: false, at: 6 } })
+    );
+  });
+
+  it('denies a malformed aiConsent', async () => {
+    await seed('users/alice', profile);
+    const db = asUser('alice');
+    await assertFails(
+      setDoc(doc(db, 'users/alice'), { aiConsent: { granted: 'yes', at: 5 } }, { merge: true })
+    );
+    await assertFails(
+      setDoc(doc(db, 'users/alice'), { aiConsent: { granted: true } }, { merge: true })
+    );
+    await assertFails(
+      setDoc(
+        doc(db, 'users/alice'),
+        { aiConsent: { granted: true, at: 5, extra: true } },
+        { merge: true }
+      )
+    );
+  });
+
+  it('denies another user from updating aiConsent', async () => {
+    await seed('users/alice', profile);
+    await assertFails(
+      updateDoc(doc(asUser('bob'), 'users/alice'), { aiConsent: { granted: true, at: 5 } })
+    );
+  });
+
   it('denies a migration marker merge when the profile does not exist yet', async () => {
     await assertFails(
       setDoc(doc(asUser('alice'), 'users/alice'), { migratedFromDexieAt: 5 }, { merge: true })

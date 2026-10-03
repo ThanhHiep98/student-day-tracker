@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { toActivity, toCategory, toDayRating, toHabitGoals } from './firestore-converters';
+import {
+  toActivity,
+  toAiComment,
+  toCategory,
+  toDayRating,
+  toHabitGoals,
+  toUserProfile,
+} from './firestore-converters';
 import { suggestedHabitGoals } from './suggested-habit-goals';
 
 describe('toActivity', () => {
@@ -69,5 +76,42 @@ describe('toDayRating', () => {
   it('omits note when absent, keeps it when a string', () => {
     expect(toDayRating(stored)).not.toHaveProperty('note');
     expect(toDayRating({ ...stored, note: 'ổn' })).toEqual({ ...stored, note: 'ổn' });
+  });
+});
+
+describe('toUserProfile', () => {
+  const stored = {
+    displayName: 'Minh Anh',
+    email: 'minhanh@example.com',
+    photoURL: null,
+    createdAt: 1,
+    privacyAcceptedAt: 1,
+  };
+
+  it('keeps exactly the UserProfile fields and drops unknown keys', () => {
+    expect(toUserProfile({ ...stored, role: 'admin' })).toEqual(stored);
+  });
+
+  it('omits aiConsent when absent or malformed, keeps it when well-shaped', () => {
+    expect(toUserProfile(stored)).not.toHaveProperty('aiConsent');
+    expect(toUserProfile({ ...stored, aiConsent: { granted: 'yes' } })).not.toHaveProperty(
+      'aiConsent'
+    );
+    expect(toUserProfile({ ...stored, aiConsent: { granted: true, at: 2 } })).toEqual({
+      ...stored,
+      aiConsent: { granted: true, at: 2 },
+    });
+  });
+});
+
+describe('toAiComment', () => {
+  it('keeps exactly the AiComment fields and drops unknown keys', () => {
+    const stored = {
+      text: 'Solid week.',
+      model: 'gemini-2.5-flash',
+      inputHash: 'abc123',
+      createdAt: 1,
+    };
+    expect(toAiComment({ ...stored, extra: true })).toEqual(stored);
   });
 });

@@ -208,7 +208,8 @@ test.describe('Insights — "Comments on your week" (slice 4)', () => {
     await expect(card.getByText('Rule-based')).toBeVisible();
     await expect(card.getByText(/You slept 6h 18m on average/)).toBeVisible();
     await expect(card.getByText(/Entertainment went over your 1h 30m cap/)).toBeVisible();
-    await expect(card.getByText('AI comments are off')).toHaveCount(0);
+    // F3 (ADR-009 ⑥): the off-state footer is always there until consent is given.
+    await expect(card.getByText('AI comments are off')).toBeVisible();
   });
 
   test('shows a neutral message with no tracked days this week', async ({ page }) => {

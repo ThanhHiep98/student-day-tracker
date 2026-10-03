@@ -19,8 +19,12 @@ interface WelcomeBackDialogProps {
   efficiency: DayEfficiency;
   /** The day before `date`'s percent, for the "Up/Down from X% the day before" line; `null` when unavailable. */
   dayBeforePercent: number | null;
-  /** One rule-based sentence from `buildRuleComments`, or `null` with nothing to say. */
+  /** Gemini's cached weekly comment if F3's AI is on and ready, otherwise one
+   * rule-based sentence from `buildRuleComments`; `null` with nothing to say. */
   comment: string | null;
+  /** Which badge to show above `comment` (ADR-009 §1.2 ④/⑧ — the same cached
+   * `aiComments/{today}` text is reused here and in Insights). */
+  commentSource: 'gemini' | 'rule-based';
   categories: Category[];
   habitGoals: HabitGoals;
   rating: DayRating | null | undefined;
@@ -83,6 +87,7 @@ export function WelcomeBackDialog({
   efficiency,
   dayBeforePercent,
   comment,
+  commentSource,
   categories,
   habitGoals,
   rating,
@@ -187,10 +192,16 @@ export function WelcomeBackDialog({
 
       {comment && (
         <div className="mx-6 mb-2 rounded-2xl border border-border bg-surface-muted p-4 text-sm leading-relaxed">
-          <span className="mb-1 block text-xs font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
-            Rule-based
-          </span>
-          {comment}
+          {commentSource === 'gemini' ? (
+            <span className="mb-1 inline-block rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+              ✨ Gemini
+            </span>
+          ) : (
+            <span className="mb-1 block text-xs font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
+              Rule-based
+            </span>
+          )}
+          <p>{comment}</p>
         </div>
       )}
 

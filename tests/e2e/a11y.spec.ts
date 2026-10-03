@@ -7,12 +7,22 @@ import {
   seedActivities,
   seedDayRatings,
   seedDexie,
+  setAiError,
+  setAiReply,
   signInAs,
 } from './support/emulator';
 import { sampleHabitGoals } from './support/sample-goals';
 import { buildSampleWeek } from './support/sample-week';
 
 const welcome = (page: Page) => page.getByRole('heading', { name: /Let's set up your day/ });
+
+/** Today as YYYY-MM-DD in the browser's timezone (F3 tests, ADR-009 ⑦⑧⑨). */
+async function browserToday(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+}
 
 /** Zero axe-core violations is a CI-equivalent gate (CLAUDE.md). */
 async function expectNoViolations(page: Page) {
@@ -337,6 +347,60 @@ test.describe('signed in', () => {
     await openSignedInWithGoals(page, sampleHabitGoals(Date.now()), '/insights/');
     await expect(page.getByRole('region', { name: '% hiệu quả · this week' })).toBeVisible();
     await expectNoViolations(page);
+  });
+
+  test('AI consent sheet ⑦ has no accessibility violations', async ({ page }) => {
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()), '/insights/');
+    await seedActivities(user.uid, buildSampleWeek(await browserToday(page), Date.now()));
+    const card = page.getByRole('region', { name: 'Comments on your week' });
+    await expectNoViolations(page);
+    await card.getByRole('button', { name: 'Turn on' }).click();
+    await expect(page.getByRole('dialog', { name: 'Get AI comments on your days?' })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('mobile AI consent sheet ⑦ has no accessibility violations', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openSignedInWithGoals(page, sampleHabitGoals(Date.now()), '/insights/');
+    const card = page.getByRole('region', { name: 'Comments on your week' });
+    await card.getByRole('button', { name: 'Turn on' }).click();
+    await expect(page.getByRole('dialog', { name: 'Get AI comments on your days?' })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('"Comments on your week" with a cached Gemini comment ⑧ has no accessibility violations', async ({
+    page,
+  }) => {
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()), '/insights/');
+    await seedActivities(user.uid, buildSampleWeek(await browserToday(page), Date.now()));
+    await setAiReply(page, 'A mocked weekly summary of the tracked days.');
+    const card = page.getByRole('region', { name: 'Comments on your week' });
+    await card.getByRole('button', { name: 'Turn on' }).click();
+    await page
+      .getByRole('dialog', { name: 'Get AI comments on your days?' })
+      .getByRole('button', { name: 'Turn on AI comments' })
+      .click();
+    await expect(card.getByText('✨ Gemini')).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('"Comments on your week" with the offline fallback notice ⑨ has no accessibility violations', async ({
+    page,
+    context,
+  }) => {
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()), '/insights/');
+    await seedActivities(user.uid, buildSampleWeek(await browserToday(page), Date.now()));
+    await setAiError(page);
+    const card = page.getByRole('region', { name: 'Comments on your week' });
+    await card.getByRole('button', { name: 'Turn on' }).click();
+    await context.setOffline(true);
+    await page
+      .getByRole('dialog', { name: 'Get AI comments on your days?' })
+      .getByRole('button', { name: 'Turn on AI comments' })
+      .click();
+    await expect(card.getByText(/AI comment unavailable offline/)).toBeVisible();
+    await expectNoViolations(page);
+    await context.setOffline(false);
   });
 });
 

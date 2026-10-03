@@ -1,4 +1,4 @@
-import type { Activity, Category, DayRating, HabitGoals } from './types';
+import type { Activity, AiComment, Category, DayRating, HabitGoals, UserProfile } from './types';
 
 /**
  * Shape guards between Firestore documents (or legacy Dexie rows) and the app
@@ -57,4 +57,34 @@ export function toDayRating(data: Record<string, unknown>): DayRating {
   };
   if (typeof data.note === 'string') rating.note = data.note;
   return rating;
+}
+
+/** `users/{uid}` (plan §2.4 + ADR-009 F3's `aiConsent`). Read-only helper —
+ * writes go through `build-user-profile.ts`/`user-profile.ts` directly, not
+ * `withConverter`, since some updates are partial merges. */
+export function toUserProfile(data: Record<string, unknown>): UserProfile {
+  const profile: UserProfile = {
+    displayName: data.displayName as string,
+    email: data.email as string,
+    photoURL: (data.photoURL as string | null) ?? null,
+    createdAt: data.createdAt as number,
+    privacyAcceptedAt: data.privacyAcceptedAt as number,
+  };
+  if (typeof data.migratedFromDexieAt === 'number') {
+    profile.migratedFromDexieAt = data.migratedFromDexieAt;
+  }
+  const aiConsent = data.aiConsent as { granted?: unknown; at?: unknown } | undefined;
+  if (aiConsent && typeof aiConsent.granted === 'boolean' && typeof aiConsent.at === 'number') {
+    profile.aiConsent = { granted: aiConsent.granted, at: aiConsent.at };
+  }
+  return profile;
+}
+
+export function toAiComment(data: Record<string, unknown>): AiComment {
+  return {
+    text: data.text as string,
+    model: data.model as string,
+    inputHash: data.inputHash as string,
+    createdAt: data.createdAt as number,
+  };
 }

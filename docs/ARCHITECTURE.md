@@ -366,3 +366,30 @@ adding them is the Implement/Test agents' job, guided by the plan the Plan agent
   short note each. No new Firestore paths or Security Rules — read-only over existing data (goals,
   activities, the signed-in user's own day ratings). AI comments, daily summaries, the parent view
   and the role choice are still F3/slice 8.
+- **v2 F3 — AI comments (built on `feat/f3-ai-comments`;
+  `architecture/ADR-009-daily-feedback-and-parent-view.md` §1.2 ⑦⑧⑨, §2.2 D9-D12):** opt-in Gemini
+  comments layered on top of slice 4's rule-based ones, never a replacement. `buildAiInput(week,
+  weekEfficiency, ratings)` (`src/lib/build-ai-input.ts`) turns `evaluateWeek`/`getWeekEfficiency`'s
+  already-aggregated output + this week's ratings into numbers and fixed goal labels only — no
+  activity names, category names, notes, display name or email ever leave this boundary (unit-tested
+  with marker strings seeded through real activities/notes); `buildAiPrompt` (`build-ai-prompt.ts`)
+  turns that into the literal ≤80-word prompt text, `hashAiInput` fingerprints it for the cached
+  doc. `src/lib/ai.ts` wraps Firebase AI Logic (`firebase/ai`'s `getAI`/`GoogleAIBackend`/
+  `getGenerativeModel`, model id `gemini-2.5-flash` in one constant) behind an injectable `AiClient`
+  interface — tests never call the real API, only a mock installed via `window.__sdtTest` (emulator
+  builds only, confirmed absent from `out/`). `firebase.ts` initializes App Check
+  (`ReCaptchaEnterpriseProvider`, the U6 site key, `isTokenAutoRefreshEnabled: true`) for
+  non-emulator browser builds; a `NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN` env var opts a dev
+  machine into the debug provider against the real project (README; never committed). Consent
+  (`AiConsentSheet`, shown from "Comments on your week"'s "Turn on" link or the account menu's new
+  "AI comments" item) is stored as `aiConsent: { granted, at }` on `users/{uid}` (Security Rules +
+  rules tests extended); `useWeeklyAiComment` calls Gemini at most once per user per day when
+  consent is on, nothing is cached yet, and the device is online, and caches the result in
+  `users/{uid}/aiComments/{date}` (`{ text, model, inputHash, createdAt }`, owner-only Security
+  Rules + rules tests) — reused as-is by both `WeekComments` (Insights, labelled "✨ Gemini" with a
+  "Generated today HH:MM … / Next update tomorrow" footer) and `WelcomeBackDialog` (④). Offline, no
+  consent, App Check failure, a model error, or an empty response all fall back to slice 4's
+  rule-based comments with a small neutral notice — never an error dialog, never a retry loop.
+  Enforcing App Check itself (Firebase console → App Check → APIs → Firebase AI Logic → Enforce)
+  stays an owner step for after this release is verified live. Daily summaries, the parent view and
+  the role choice are still slice 8, the last PR.

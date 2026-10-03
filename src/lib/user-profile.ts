@@ -21,3 +21,13 @@ export async function ensureUserProfile(
   trackWrite(setDoc(ref, buildUserProfile(user, now)));
   return 'created';
 }
+
+/**
+ * Give or withdraw AI-comment consent (ADR-009 §2.2 D10/D12) — the consent
+ * sheet's "Turn on AI comments" and the account menu's "Turn off" both call
+ * this. Fire-and-forget merge, same pattern as the migration marker in
+ * `migrate-local-data.ts`.
+ */
+export function setAiConsent(scope: UserScope, granted: boolean, now: number = Date.now()): void {
+  trackWrite(setDoc(userDoc(scope), { aiConsent: { granted, at: now } }, { merge: true }));
+}

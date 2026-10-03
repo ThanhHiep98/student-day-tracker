@@ -1,11 +1,14 @@
 'use client';
 
 import { getInitial } from '@/lib/get-given-name';
+import { useAiConsent } from '@/lib/use-ai-consent';
 import { type AuthUser, useAuth } from '@/lib/use-auth';
 import { useSignOut } from '@/lib/use-sign-out';
 import { type SyncStatus, useSyncStatus } from '@/lib/use-sync-status';
+import { setAiConsent } from '@/lib/user-profile';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
+import { AiConsentSheet } from './ai-consent-sheet';
 import { ConfirmDialog } from './confirm-dialog';
 import { ThemeToggle } from './theme-toggle';
 
@@ -55,6 +58,57 @@ function Avatar({ user, size }: { user: AuthUser; size: 'md' | 'lg' }) {
   );
 }
 
+/**
+ * F3 (ADR-009 §1.2 ⑦) — the "AI comments" on/off item shared by the desktop
+ * popover and the mobile sheet. Turning on opens the consent sheet (choice
+ * stored on the profile either way, D10/D12); turning off withdraws at once,
+ * no confirmation needed.
+ */
+function useAiConsentControl() {
+  const { scope } = useAuth();
+  const consent = useAiConsent();
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  function toggle() {
+    if (consent) {
+      if (scope) setAiConsent(scope, false);
+    } else {
+      setSheetOpen(true);
+    }
+  }
+  function turnOn() {
+    if (scope) setAiConsent(scope, true);
+    setSheetOpen(false);
+  }
+  function notNow() {
+    if (scope) setAiConsent(scope, false);
+    setSheetOpen(false);
+  }
+
+  return { consent, sheetOpen, toggle, turnOn, notNow };
+}
+
+function AiConsentMenuItem({
+  control,
+  className,
+}: {
+  control: ReturnType<typeof useAiConsentControl>;
+  className: string;
+}) {
+  return (
+    <>
+      <button type="button" onClick={control.toggle} className={className}>
+        AI comments: {control.consent ? 'On' : 'Off'} · {control.consent ? 'Turn off' : 'Turn on'}
+      </button>
+      <AiConsentSheet
+        open={control.sheetOpen}
+        onTurnOn={control.turnOn}
+        onNotNow={control.notNow}
+      />
+    </>
+  );
+}
+
 function SignOutConfirm({ flow }: { flow: ReturnType<typeof useSignOut> }) {
   return (
     <ConfirmDialog
@@ -78,6 +132,7 @@ const SIGN_OUT_ITEM =
 export function SidebarAccount() {
   const { user } = useAuth();
   const flow = useSignOut();
+  const aiControl = useAiConsentControl();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -126,6 +181,7 @@ export function SidebarAccount() {
           <Link href="/goals/" onClick={() => setOpen(false)} className={MENU_ITEM}>
             Habits &amp; goals
           </Link>
+          <AiConsentMenuItem control={aiControl} className={MENU_ITEM} />
           <Link href="/privacy/" onClick={() => setOpen(false)} className={MENU_ITEM}>
             Privacy notice
           </Link>
@@ -182,6 +238,7 @@ export function SidebarAccount() {
 export function MobileAccountButton({ className = '' }: { className?: string }) {
   const { user } = useAuth();
   const flow = useSignOut();
+  const aiControl = useAiConsentControl();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -243,6 +300,10 @@ export function MobileAccountButton({ className = '' }: { className?: string }) 
         >
           Habits &amp; goals
         </Link>
+        <AiConsentMenuItem
+          control={aiControl}
+          className="flex min-h-11 w-full items-center rounded-lg px-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100"
+        />
         <Link
           href="/privacy/"
           onClick={() => setOpen(false)}

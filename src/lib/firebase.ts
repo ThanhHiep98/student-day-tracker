@@ -1,4 +1,5 @@
 import { type FirebaseApp, deleteApp, initializeApp } from 'firebase/app';
+import { ReCaptchaEnterpriseProvider, initializeAppCheck } from 'firebase/app-check';
 import { type Auth, connectAuthEmulator, getAuth } from 'firebase/auth';
 import {
   type Firestore,
@@ -8,7 +9,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
 } from 'firebase/firestore';
-import { firebaseConfig } from './firebase-config';
+import { APP_CHECK_SITE_KEY, firebaseConfig } from './firebase-config';
 
 /**
  * Lazy Firebase singletons (plan §2.4 implementation notes). Nothing is
@@ -41,6 +42,28 @@ function emulatorsEnabled(): boolean {
 }
 
 /**
+ * App Check (ADR-009 §2.2 D12), real reCAPTCHA Enterprise provider, skipped
+ * entirely for emulator builds (F3's AI calls there use a mocked `AiClient`,
+ * see `ai.ts`/`firebase-test-hooks.ts` — never the real Gemini Developer API,
+ * so there is nothing for App Check to protect in tests). In dev against the
+ * real project, set `NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN` (see README)
+ * to a token registered in the Firebase console, or to any non-empty string
+ * to have the SDK mint and log a fresh one on first run — never commit a real
+ * token. Enforcement itself is a separate, later step in the Firebase console
+ * (plan's "owner steps"): initializing App Check here does not turn it on.
+ */
+function initAppCheck(app: FirebaseApp): void {
+  const debugToken = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN;
+  if (debugToken) {
+    (globalThis as Record<string, unknown>).FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
+
+/**
  * Create an independent client. The app uses the `getFirebase()` singleton;
  * emulator tests create extra named instances to act as a second device.
  */
@@ -61,6 +84,9 @@ export function createFirebaseClient(name?: string): FirebaseClient {
   if (useEmulators) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
     connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  } else if (typeof window !== 'undefined') {
+    // Browser only, and never during static-export prerendering in Node.
+    initAppCheck(app);
   }
   return { app, auth, db };
 }

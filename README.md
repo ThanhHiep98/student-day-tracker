@@ -31,7 +31,7 @@ See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) → "Status".
 | UI library | **React 19** | Stable in Next 16 |
 | Language | **TypeScript** (strict mode) | Type safety end-to-end, including the Firestore documents |
 | Styling | **Tailwind CSS v4** | Native CSS variables, no PostCSS config |
-| Data + auth | **Firebase** — Auth (Google), Cloud Firestore with offline cache, Security Rules | Accounts, multi-device sync, offline after first sign-in, no server to run ([ADR-007](./architecture/ADR-007-firebase.md)) |
+| Data + auth | **Firebase** — Auth (Google), Cloud Firestore with offline cache, Security Rules, AI Logic (Gemini) + App Check | Accounts, multi-device sync, offline after first sign-in, no server to run ([ADR-007](./architecture/ADR-007-firebase.md)) |
 | Visualization | **D3 utilities** (`d3-scale`, `d3-time-format`) | Compose scales + SVG directly for Insights, no chart library |
 | PWA | **Serwist** (`@serwist/next`) | Modern successor to `next-pwa` |
 | State | **`useState` + Firestore live queries** | No global store |
@@ -74,6 +74,23 @@ pnpm typecheck    # tsc --noEmit
 
 Security Rules (`firestore.rules`) are deployed by the project owner, not CI:
 `pnpm exec firebase deploy --only firestore:rules --project student-day-tracker`.
+
+### AI comments (F3) in local dev
+
+`pnpm emulators` + `pnpm dev:emu` always use a mocked AI client (`window.__sdtTest.setAiReply`/
+`setAiError`, emulator builds only) — no real Gemini call, no App Check. Against the **real**
+project (plain `pnpm dev`), App Check (reCAPTCHA Enterprise) normally blocks calls from
+`localhost`. To try the real Gemini call from a dev machine instead:
+
+1. Firebase Console → **App Check → Apps → Student Day Tracker (Web) → Manage debug tokens** →
+   add a debug token (a random UUID you generate yourself — do **not** reuse someone else's).
+2. Run `NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN=<that-uuid> pnpm dev` and open the app from that
+   machine. Never commit the token or add `localhost` to the reCAPTCHA key itself — the debug
+   token is the only sanctioned way around it.
+
+App Check enforcement for Firebase AI Logic itself is a separate, manual step the project owner
+flips on in the console (App Check → APIs → Firebase AI Logic → Enforce) after a release is
+verified live — it is off while the feature is rolled out.
 
 ## Deploy
 
