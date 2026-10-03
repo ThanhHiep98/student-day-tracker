@@ -80,6 +80,31 @@ export const GOAL_META: Record<GoalKey, { label: string; icon: string; rowPrefix
   entertainment: { label: 'Entertainment', icon: '🎮', rowPrefix: 'Entertainment' },
 };
 
+/**
+ * The category id backing `key` under the current goal→category mapping
+ * (ADR-008 D-B iii, editable on `/goals`). `evaluateDay` itself only needs
+ * this internally (`minutesFor`, `schoolMinutesLogged`); it's exported for
+ * callers outside the findings that still need a goal's category — e.g.
+ * slice 5's efficiency bars, which color each goal by its own category
+ * (CLAUDE.md: no new hardcoded colors outside a category's own `color`).
+ */
+export function goalCategoryId(goals: HabitGoals, key: GoalKey): string {
+  switch (key) {
+    case 'sleep':
+      return goals.sleep.categoryId;
+    case 'school':
+      return goals.school.categoryId;
+    case 'extraClass':
+      return goals.extraClass.categoryId;
+    case 'selfStudy':
+      return goals.selfStudy.categoryId;
+    case 'meals':
+      return goals.meals.categoryId;
+    case 'entertainment':
+      return goals.entertainment.categoryId;
+  }
+}
+
 function mod(n: number, m: number): number {
   return ((n % m) + m) % m;
 }

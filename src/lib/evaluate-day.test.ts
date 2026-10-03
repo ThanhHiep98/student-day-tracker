@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { BEDTIME_WARN_MINUTES, bedtimeOffsetMinutes, evaluateDay } from './evaluate-day';
+import {
+  BEDTIME_WARN_MINUTES,
+  bedtimeOffsetMinutes,
+  evaluateDay,
+  goalCategoryId,
+} from './evaluate-day';
 import { suggestedHabitGoals } from './suggested-habit-goals';
 import type { Activity, HabitGoals } from './types';
 
@@ -308,5 +313,24 @@ describe('evaluateDay — totalTrackedMinutes / dayEnded (D7 untracked days)', (
   it('dayEnded is false for today and true for a date before today', () => {
     expect(evaluateDay([], GOALS, TODAY, NOW_MIDDAY).dayEnded).toBe(false);
     expect(evaluateDay([], GOALS, YESTERDAY, NOW_MIDDAY).dayEnded).toBe(true);
+  });
+});
+
+describe('goalCategoryId (ADR-008 D-B iii mapping, used by slice 5 for per-goal bar colors)', () => {
+  it('returns each goal area’s current category id', () => {
+    expect(goalCategoryId(GOALS, 'sleep')).toBe('sleep');
+    expect(goalCategoryId(GOALS, 'school')).toBe('school');
+    expect(goalCategoryId(GOALS, 'extraClass')).toBe('extra-class');
+    expect(goalCategoryId(GOALS, 'selfStudy')).toBe('self-study');
+    expect(goalCategoryId(GOALS, 'meals')).toBe('meals');
+    expect(goalCategoryId(GOALS, 'entertainment')).toBe('entertainment');
+  });
+
+  it('follows a remapped goal (D-B: goals can point at a different/custom category)', () => {
+    const remapped: HabitGoals = {
+      ...GOALS,
+      sleep: { ...GOALS.sleep, categoryId: 'custom-rest' },
+    };
+    expect(goalCategoryId(remapped, 'sleep')).toBe('custom-rest');
   });
 });

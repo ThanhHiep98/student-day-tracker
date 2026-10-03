@@ -2,6 +2,7 @@
 
 import { ActivityAnalyticsPanel } from '@/components/activity-analytics-panel';
 import { ComparePanel } from '@/components/compare-panel';
+import { EfficiencySection } from '@/components/efficiency-section';
 import { InsightCards } from '@/components/insight-cards';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { MonthlyOverviewCard } from '@/components/monthly-overview-card';
@@ -13,6 +14,7 @@ import { buildRuleComments } from '@/lib/build-rule-comments';
 import { getWeekToDateComparison } from '@/lib/compare-periods';
 import { evaluateWeek } from '@/lib/evaluate-week';
 import { getActivityAnalytics } from '@/lib/get-activity-analytics';
+import { getWeekEfficiency } from '@/lib/get-efficiency';
 import { getMonthlySummary } from '@/lib/get-monthly-summary';
 import { getRatingTrend } from '@/lib/get-rating-trend';
 import { filterByDateRange, getWeeklySummary } from '@/lib/get-weekly-summary';
@@ -49,9 +51,9 @@ export default function InsightsPage() {
     if (!activities || !categories || !weekRatings) return undefined;
     const monthActivities = filterByDateRange(activities, monthStart, today);
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-    const weekComments =
+    const week =
       habitGoals && habitGoals.status === 'completed'
-        ? buildRuleComments(evaluateWeek(activities, habitGoals, weekStart, fromIsoDate(today)))
+        ? evaluateWeek(activities, habitGoals, weekStart, fromIsoDate(today))
         : null;
     return {
       weekly: getWeeklySummary(activities, categories, weekStart),
@@ -60,7 +62,10 @@ export default function InsightsPage() {
       monthly: getMonthlySummary(monthActivities, categories, monthStart),
       analytics: getActivityAnalytics(monthActivities),
       ratingTrend: getRatingTrend(weekRatings, weekDays),
-      weekComments,
+      weekComments: week ? buildRuleComments(week) : null,
+      // ADR-009 §1.2 ⑤ "% hiệu quả · this week" — same `evaluateWeek` rollup as
+      // the rule-based comments above, scored per D6/D7.
+      efficiency: week ? getWeekEfficiency(week) : null,
     };
   }, [activities, categories, weekStart, monthStart, today, weekRatings, habitGoals]);
 
@@ -77,6 +82,13 @@ export default function InsightsPage() {
         <LoadingSkeleton />
       ) : (
         <>
+          {derived.efficiency && habitGoals && habitGoals.status === 'completed' && (
+            <EfficiencySection
+              efficiency={derived.efficiency}
+              categories={categories}
+              habitGoals={habitGoals}
+            />
+          )}
           {derived.weekComments !== null && <WeekComments comments={derived.weekComments} />}
           <RatingTrend trend={derived.ratingTrend} />
           <WeeklyOverviewChart {...derived.weekly} categories={categories} />
