@@ -142,6 +142,8 @@ offered — it disappears once the plan is saved.
 
 ![⑨ Habits & goals page: six rows with icon, label, “Counts toward …”, editable value; buttons Re-run questionnaire and Save](./assets/adr-008/09-habits-goals-desktop.webp)
 
+> **Owner decision 2026-10-04:** the built page reuses the wizard's +/− steppers and inputs per row instead of the single compact value box shown here — accepted.
+
 Same data as the wizard in one form, opened from the account menu (new item “Habits & goals” in F2’s ⑥ / ⑧). Changes
 apply from the day they are saved (D8).
 
