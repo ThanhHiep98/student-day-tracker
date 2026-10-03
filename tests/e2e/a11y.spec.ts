@@ -4,6 +4,8 @@ import type { Activity } from '../../src/lib/types';
 import { openSignedIn, seedActivities, seedDexie, signInAs } from './support/emulator';
 import { buildSampleWeek } from './support/sample-week';
 
+const welcome = (page: Page) => page.getByRole('heading', { name: /Let's set up your day/ });
+
 /** Zero axe-core violations is a CI-equivalent gate (CLAUDE.md). */
 async function expectNoViolations(page: Page) {
   const { violations } = await new AxeBuilder({ page }).analyze();
@@ -146,9 +148,56 @@ test('migration dialog ④ has no accessibility violations', async ({ page }) =>
   await seedDexie(page, [row]);
   // Hold Firestore writes so the dialog stays open while axe runs.
   await page.route('**/google.firestore.v1.Firestore/Write/**', (_route: Route) => {});
-  await signInAs(page);
+  // The migration dialog can land over either Home or the onboarding wizard
+  // (ADR-008 §2.4) — observe it directly rather than skipping onboarding first.
+  await signInAs(page, { waitForHome: false });
   await expect(
     page.getByRole('dialog', { name: 'Moving your activities to your account' })
   ).toBeVisible();
   await expectNoViolations(page);
+});
+
+test.describe('onboarding (ADR-008)', () => {
+  test('welcome ① has no accessibility violations', async ({ page }) => {
+    await page.goto('/');
+    await signInAs(page, { waitForHome: false });
+    await expect(welcome(page)).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('a question step has no accessibility violations', async ({ page }) => {
+    await page.goto('/');
+    await signInAs(page, { waitForHome: false });
+    await expect(welcome(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Start' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'How much sleep do you want each night?' })
+    ).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('review ⑦ has no accessibility violations', async ({ page }) => {
+    await page.goto('/');
+    await signInAs(page, { waitForHome: false });
+    await page.getByRole('button', { name: 'Start' }).click();
+    for (let i = 0; i < 4; i++)
+      await page.getByRole('button', { name: 'Next', exact: true }).click();
+    await page.getByRole('button', { name: 'Review' }).click();
+    await expect(page.getByRole('heading', { name: 'Your ideal school day' })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('Home banner ⑧ has no accessibility violations', async ({ page }) => {
+    await page.goto('/');
+    await signInAs(page, { waitForHome: false });
+    await page.getByRole('button', { name: 'Skip for now' }).click();
+    await expect(page.getByText('Finish setting up your day')).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('Habits & goals ⑨ has no accessibility violations', async ({ page }) => {
+    await openSignedIn(page, '/goals/');
+    await expect(page.getByRole('heading', { name: 'Habits & goals' })).toBeVisible();
+    await expectNoViolations(page);
+  });
 });

@@ -213,13 +213,15 @@ test('an activity from 21:00 yesterday to 01:00 today is split across both days 
   const confirmDialog = page.getByRole('dialog');
   await expect(confirmDialog.getByText(/this removes both days/)).toBeVisible();
   await confirmDialog.getByRole('button', { name: 'Delete' }).click();
-  await expect(page.getByText('Sleep')).toHaveCount(0);
+  // Both halves are gone — Home falls back to its empty state. (A plain
+  // getByText('Sleep') would also match the "😴 Sleep" default-category
+  // option sitting in the closed Add Activity dialog's <select>.)
+  await expect(page.getByRole('heading', { name: 'No activities yet today' })).toBeVisible();
 
   await page.reload();
-  await expect(page.getByText('Sleep')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'No activities yet today' })).toBeVisible();
   await openHistoryDay(page, yesterday.day, yesterday.previousMonth);
   await expect(page.getByRole('heading', { name: 'No activities yet today' })).toBeVisible();
-  await expect(page.getByText('Sleep')).toHaveCount(0);
 });
 
 test('editing a span back to a same-day time leaves a single row', async ({ page }) => {
