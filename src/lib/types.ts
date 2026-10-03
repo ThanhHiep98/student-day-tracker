@@ -115,3 +115,26 @@ export interface AiComment {
   inputHash: string;
   createdAt: number;
 }
+
+/**
+ * `users/{uid}/summaries/{IsoDate}` (ADR-009 §2.3 D14/D16, slice 8a) — the
+ * only document a linked parent is ever allowed to read (Security Rules,
+ * 8b). Deliberately numbers-only, same spirit as `AiInput`
+ * (`build-ai-input.ts`): no activity names/times, category names, rating
+ * notes, AI text, display name or email — see `build-day-summary.ts`. Field
+ * names (`actual`/`target`/`score`) intentionally differ from
+ * `evaluateDay`/`getEfficiency`'s `actualMinutes`/`targetMinutes` to match
+ * the ADR's schema literally.
+ */
+export interface DaySummary {
+  /** 0-100, rounded; `null` when nothing was tracked that day (D7). */
+  efficiency: number | null;
+  goals: Record<
+    'sleep' | 'school' | 'extraClass' | 'selfStudy' | 'meals' | 'entertainment',
+    { actual: number; target: number | null; score: number | null }
+  >;
+  warnings: ('sleep-short' | 'bedtime-late' | 'entertainment-over' | 'target-missed')[];
+  /** This day's rating score only (never the note) — `null` if not rated. */
+  ratingScore: number | null;
+  updatedAt: number;
+}
