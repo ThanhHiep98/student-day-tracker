@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Proposed — awaiting owner review** (2026-10-03). Approve by figure number ①–⑬ and defaults D1–D16. |
+| **Status** | **Accepted** — owner approved 2026-10-04 (images ①–⑬, defaults D1–D16 incl. D6 formula, D14 parent scope, D15 role choice). Review: GitHub issue #3. |
 | **Covers slices** | 3 Daily satisfaction rating · 4 Goal-violation warnings + rule-based comments · F3 AI comments · 5 % efficiency · 8 Parent-facing view |
 | **Requirement** | `requirement/Requirement.txt` — “Đánh giá mức độ hài lòng trong ngày”; “… đưa ra cảnh báo nếu activity của User đang vi phạm. Đưa ra nhận xét cho người dùng.”; “Khi học sinh đăng nhập sẽ dựa vào chuẩn đầu vào tính % hiệu quả đưa ra nhận xét”; “… hỗ trợ gợi ý cho học sinh và phụ huynh” — `docs/REQUIREMENTS.md` §4 |
 | **Depends on** | [ADR-007](./ADR-007-firebase.md) (Firebase, Spark plan) · [ADR-008](./ADR-008-onboarding-habits.md) (goals = “chuẩn đầu vào”) · F2 account + sign-in in [`plans/2026-10-01-v2-roadmap-cross-midnight.html`](../plans/2026-10-01-v2-roadmap-cross-midnight.html) · slice 1 (sleep crosses midnight) |
@@ -98,8 +98,7 @@ are the target the implementer must match.
 Rendered from the live app (real fonts, tokens, layout) with the new elements injected. Sample student *Minh Anh*
 (goals from ADR-008), sample parent *Mẹ*.
 
-> **Owner review:** comment by number, e.g. “④ bỏ nút Rate yesterday”, “⑬ cho phụ huynh xem ghi chú”. Approved images
-> become the acceptance reference in §2.7.
+> **Approved by the owner on 2026-10-04.** These images are the acceptance reference in §2.7.
 
 **Sitemap**
 
