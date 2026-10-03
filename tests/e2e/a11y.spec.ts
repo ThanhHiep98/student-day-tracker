@@ -6,8 +6,10 @@ import {
   seedActivities,
   seedDayRatings,
   seedDexie,
+  seedHabitGoals,
   signInAs,
 } from './support/emulator';
+import { sampleHabitGoals } from './support/sample-goals';
 import { buildSampleWeek } from './support/sample-week';
 
 const welcome = (page: Page) => page.getByRole('heading', { name: /Let's set up your day/ });
@@ -172,6 +174,84 @@ test.describe('signed in', () => {
     await seedDayRatings(user.uid, [{ date: today, rating: { score: 5, updatedAt: Date.now() } }]);
     await page.getByRole('link', { name: 'Insights' }).click();
     await expect(page.getByRole('region', { name: 'How your days felt' })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('Home has no accessibility violations with "Today vs your plan" warnings showing (ADR-009 ①)', async ({
+    page,
+  }) => {
+    const user = await openSignedIn(page);
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
+    await seedActivities(user.uid, [
+      {
+        id: 'sleep-1',
+        categoryId: 'sleep',
+        name: 'Sleep',
+        date: today,
+        startMinutes: 40,
+        endMinutes: 410,
+        createdAt: 1,
+      },
+      {
+        id: 'entertainment-1',
+        categoryId: 'entertainment',
+        name: 'Gaming',
+        date: today,
+        startMinutes: 600,
+        endMinutes: 730,
+        createdAt: 2,
+      },
+    ]);
+    await page.reload();
+    await expect(page.getByRole('region', { name: 'Today vs your plan' })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('mobile Home has no accessibility violations with the compact plan card (ADR-009 ②)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const user = await openSignedIn(page);
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
+    await seedActivities(user.uid, [
+      {
+        id: 'sleep-1',
+        categoryId: 'sleep',
+        name: 'Sleep',
+        date: today,
+        startMinutes: 40,
+        endMinutes: 410,
+        createdAt: 1,
+      },
+    ]);
+    await page.reload();
+    const card = page.getByRole('region', { name: 'Today vs your plan' });
+    await expect(card).toBeVisible();
+    await expectNoViolations(page);
+    await card.getByRole('button', { name: 'Show all' }).click();
+    await expectNoViolations(page);
+  });
+
+  test('/insights/ has no accessibility violations with weekly comments showing (ADR-009 ⑥)', async ({
+    page,
+  }) => {
+    const user = await openSignedIn(page);
+    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await seedActivities(user.uid, buildSampleWeek(today, Date.now()));
+    await page.getByRole('link', { name: 'Insights' }).click();
+    await expect(page.getByRole('region', { name: 'Comments on your week' })).toBeVisible();
     await expectNoViolations(page);
   });
 });

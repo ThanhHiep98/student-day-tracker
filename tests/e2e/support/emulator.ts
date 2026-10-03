@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type Page, expect } from '@playwright/test';
 import type { SdtTestHooks } from '../../../src/lib/firebase-test-hooks';
-import type { Activity, Category, DayRating, IsoDate } from '../../../src/lib/types';
+import type { Activity, Category, DayRating, HabitGoals, IsoDate } from '../../../src/lib/types';
 
 /**
  * E2E helpers for the Auth + Firestore emulators (plan §2.5 phase 3 Tests).
@@ -83,8 +83,11 @@ type FirestoreValue =
   | { integerValue: string }
   | { doubleValue: number }
   | { booleanValue: boolean }
-  | { nullValue: null };
+  | { nullValue: null }
+  | { arrayValue: { values: FirestoreValue[] } }
+  | { mapValue: { fields: Record<string, FirestoreValue> } };
 
+/** Recursive — handles the nested objects/arrays in `HabitGoals` (e.g. `school.blocks`). */
 function encode(value: unknown): FirestoreValue {
   if (value === null) return { nullValue: null };
   if (typeof value === 'string') return { stringValue: value };
@@ -92,6 +95,8 @@ function encode(value: unknown): FirestoreValue {
   if (typeof value === 'number') {
     return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
   }
+  if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
+  if (typeof value === 'object') return { mapValue: { fields: fields(value as object) } };
   throw new Error(`Unsupported value ${String(value)}`);
 }
 
@@ -137,6 +142,11 @@ export async function seedDayRatings(
       }))
     );
   }
+}
+
+/** Write the `users/{uid}/goals/habits` document straight to the emulator (ADR-008 §2.3). */
+export async function seedHabitGoals(uid: string, goals: HabitGoals): Promise<void> {
+  await commit([{ update: { name: docName(`users/${uid}/goals/habits`), fields: fields(goals) } }]);
 }
 
 /** Plain JSON of every activity stored for `uid` on the emulator (server side). */
