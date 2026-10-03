@@ -1,9 +1,16 @@
 import { expect, test } from '@playwright/test';
-import { openSignedIn, seedDayRatings } from './support/emulator';
+import {
+  openSignedIn,
+  openSignedInWithGoals,
+  seedActivities,
+  seedDayRatings,
+} from './support/emulator';
+import { sampleHabitGoals } from './support/sample-goals';
 
 /**
- * Daily satisfaction rating (ADR-009 §1.2 ①③⑤, slice 3 only — warnings, %
- * hiệu quả, AI comments and the parent view are out of scope for this PR).
+ * Daily satisfaction rating (ADR-009 §1.2 ①③⑤, slice 3) and goal-violation
+ * warnings + rule-based comments (§1.2 ①②⑥, slice 4 — % hiệu quả, AI
+ * comments and the parent view are later PRs).
  */
 
 /** Today as YYYY-MM-DD in the browser's timezone. */
@@ -65,6 +72,154 @@ test.describe('History', () => {
       'aria-pressed',
       'true'
     );
+  });
+});
+
+test.describe('Home — "Today vs your plan" (slice 4)', () => {
+  test("shows each goal's status and the bedtime nudge, matching ADR-009 ①", async ({ page }) => {
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
+    const today = await browserToday(page);
+    await seedActivities(user.uid, [
+      {
+        id: 'sleep-1',
+        categoryId: 'sleep',
+        name: 'Sleep',
+        date: today,
+        startMinutes: 40,
+        endMinutes: 410,
+        createdAt: 1,
+      },
+      {
+        id: 'entertainment-1',
+        categoryId: 'entertainment',
+        name: 'Gaming',
+        date: today,
+        startMinutes: 600,
+        endMinutes: 670,
+        createdAt: 2,
+      },
+      {
+        id: 'self-study-1',
+        categoryId: 'self-study',
+        name: 'Revision',
+        date: today,
+        startMinutes: 700,
+        endMinutes: 790,
+        createdAt: 3,
+      },
+      {
+        id: 'extra-class-1',
+        categoryId: 'extra-class',
+        name: 'Extra math',
+        date: today,
+        startMinutes: 800,
+        endMinutes: 920,
+        createdAt: 4,
+      },
+      {
+        id: 'meals-1',
+        categoryId: 'meals',
+        name: 'Lunch',
+        date: today,
+        startMinutes: 930,
+        endMinutes: 975,
+        createdAt: 5,
+      },
+    ]);
+    await page.reload();
+
+    const card = page.getByRole('region', { name: 'Today vs your plan' });
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Slept 6h 10m')).toBeVisible();
+    await expect(card.getByText('1h 20m under 7h 30m')).toBeVisible();
+    await expect(card.getByText('Entertainment 1h 10m')).toBeVisible();
+    await expect(card.getByText('within 1h 30m')).toBeVisible();
+    await expect(card.getByText('Self-study 1h 30m')).toBeVisible();
+    await expect(card.getByText('1h 30m to go')).toBeVisible();
+    await expect(card.getByText('Extra class 2h')).toBeVisible();
+    await expect(card.getByText('Meals 45m')).toBeVisible();
+    await expect(card.getByText('so far', { exact: true })).toBeVisible();
+    await expect(
+      card.getByText(
+        'You went to bed at 00:40 — 1h 40m later than your 23:00 plan. An earlier night today would get you back on track.'
+      )
+    ).toBeVisible();
+  });
+
+  test('warns live once entertainment goes over its cap', async ({ page }) => {
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
+    const today = await browserToday(page);
+    await seedActivities(user.uid, [
+      {
+        id: 'entertainment-over',
+        categoryId: 'entertainment',
+        name: 'Gaming',
+        date: today,
+        startMinutes: 0,
+        endMinutes: 130,
+        createdAt: 1,
+      },
+    ]);
+    await page.reload();
+
+    const card = page.getByRole('region', { name: 'Today vs your plan' });
+    await expect(card.getByText('40m over the 1h 30m cap')).toBeVisible();
+  });
+
+  test('renders nothing before Habits & goals is completed', async ({ page }) => {
+    await openSignedIn(page);
+    await expect(page.getByRole('region', { name: 'Today vs your plan' })).toHaveCount(0);
+    await expect(page.getByText('Finish setting up your day')).toBeVisible();
+  });
+});
+
+test.describe('Insights — "Comments on your week" (slice 4)', () => {
+  test('shows the rule-based label and template sentences', async ({ page }) => {
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
+    const today = await browserToday(page);
+    // One tracked, ended day with a short sleep and an entertainment overrun.
+    const yesterday = new Date(`${today}T00:00:00`);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const y = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    await seedActivities(user.uid, [
+      {
+        id: 'y-sleep',
+        categoryId: 'sleep',
+        name: 'Sleep',
+        date: y,
+        startMinutes: 0,
+        endMinutes: 378,
+        createdAt: 1,
+      },
+      {
+        id: 'y-entertainment',
+        categoryId: 'entertainment',
+        name: 'Gaming',
+        date: y,
+        startMinutes: 500,
+        endMinutes: 620,
+        createdAt: 2,
+      },
+    ]);
+
+    await page.getByRole('link', { name: 'Insights' }).click();
+    const card = page.getByRole('region', { name: 'Comments on your week' });
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Rule-based')).toBeVisible();
+    await expect(card.getByText(/You slept 6h 18m on average/)).toBeVisible();
+    await expect(card.getByText(/Entertainment went over your 1h 30m cap/)).toBeVisible();
+    await expect(card.getByText('AI comments are off')).toHaveCount(0);
+  });
+
+  test('shows a neutral message with no tracked days this week', async ({ page }) => {
+    await openSignedInWithGoals(page, sampleHabitGoals(Date.now()), '/insights/');
+    const card = page.getByRole('region', { name: 'Comments on your week' });
+    await expect(card.getByText('Track a few days this week to see comments here.')).toBeVisible();
+  });
+
+  test('renders nothing before Habits & goals is completed', async ({ page }) => {
+    await openSignedIn(page, '/insights/');
+    await expect(page.getByRole('region', { name: 'Comments on your week' })).toHaveCount(0);
   });
 });
 

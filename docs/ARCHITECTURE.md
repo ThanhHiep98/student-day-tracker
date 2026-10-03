@@ -325,3 +325,21 @@ adding them is the Implement/Test agents' job, guided by the plan the Plan agent
   Pure helpers `buildDayRating`, `isDayRatable`, `getRatingTrend`; Firestore doc
   `users/{uid}/dayRatings/{date}` + Security Rules. The rest of ADR-009 (warnings, rule-based/AI
   comments, % hiệu quả, welcome-back dialog, parent view) is not built yet.
+- **v2 slice 4 — goal-violation warnings + rule-based comments (built on
+  `feat/slice4-warnings-comments`; `architecture/ADR-009-daily-feedback-and-parent-view.md`
+  §1.2 ①②⑥/§2, D3-D5):** one pure evaluation core —
+  `evaluateDay(activities, goals, date, now)` (per-goal actual vs. target, status `ok`/`warn`/
+  `pending`, the bedtime nudge, warning codes) and `evaluateWeek(activities, goals, weekStart,
+  now)` (the same, rolled up over a Mon–Sun week, excluding today and untracked days, D7) —
+  `src/lib/evaluate-day.ts`, `evaluate-week.ts` + table tests. `buildRuleComments(week)` turns a
+  week's rollup into up to three neutral, specific-numbers sentences (sleep average, the
+  entertainment cap, and one combined sentence for the other targets); a fuzz test asserts none of
+  them ever say "good"/"bad"/"bad day"/"failed". `PlanStatusCard` ("Today vs your plan") sits above
+  the daily summary on Home: icon + text per row (never colour alone), desktop shows every goal
+  that applies today, mobile shows the three most relevant (any warning first) behind a "Show all"
+  toggle, and at most one amber bedtime nudge. `WeekComments` ("Comments on your week") sits above
+  Weekly overview on Insights, labelled "Rule-based" — this slice ships only that state; the
+  "Gemini" label and the AI on/off footer link are F3. Both read `users/{uid}/goals/habits` and
+  render nothing before it's completed (the existing onboarding banner already covers that
+  prompt). No new Firestore paths or Security Rules — read-only over existing data. Feeds slice 5's
+  `getEfficiency` and slice 8's `buildDaySummary`, which reuse `evaluateDay`/`evaluateWeek`.
