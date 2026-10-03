@@ -148,6 +148,17 @@ service cloud.firestore {
             + d.selfStudy.targetMinutesPerDay + d.meals.targetMinutesPerDay) <= 1440;
     }
 
+    // ADR-009 §2.3 — users/{uid}/dayRatings/{date}. Doc id is the IsoDate
+    // (not stored as a field); field limits mirror build-day-rating.ts.
+    function validDayRating(id, d) {
+      return d.keys().hasAll(['score', 'updatedAt'])
+        && d.keys().hasOnly(['score', 'updatedAt', 'note'])
+        && id.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && intIn(d.score, 1, 5)
+        && d.updatedAt is number
+        && (!('note' in d) || str(d.note, 0, 280));
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid) && validProfile(request.resource.data);
@@ -169,6 +180,11 @@ service cloud.firestore {
       match /goals/{goalId} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && goalId == 'habits' && validHabitGoals(request.resource.data);
+      }
+
+      match /dayRatings/{date} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validDayRating(date, request.resource.data);
       }
     }
   }

@@ -5,15 +5,18 @@ import { ComparePanel } from '@/components/compare-panel';
 import { InsightCards } from '@/components/insight-cards';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { MonthlyOverviewCard } from '@/components/monthly-overview-card';
+import { RatingTrend } from '@/components/rating-trend';
 import { WeeklyOverviewChart } from '@/components/weekly-overview-chart';
 import { buildInsightCards } from '@/lib/build-insight-cards';
 import { getWeekToDateComparison } from '@/lib/compare-periods';
 import { getActivityAnalytics } from '@/lib/get-activity-analytics';
 import { getMonthlySummary } from '@/lib/get-monthly-summary';
+import { getRatingTrend } from '@/lib/get-rating-trend';
 import { filterByDateRange, getWeeklySummary } from '@/lib/get-weekly-summary';
 import { addDays, startOfMonth, startOfWeek, toIsoDate } from '@/lib/iso-date';
 import { useActivitiesRange } from '@/lib/use-activities-range';
 import { useCategories } from '@/lib/use-categories';
+import { useDayRatingsRange } from '@/lib/use-day-ratings-range';
 import { useMemo, useState } from 'react';
 
 /**
@@ -32,20 +35,24 @@ export default function InsightsPage() {
   const monthStart = startOfMonth(today);
   const prevWeekStart = addDays(weekStart, -7);
   const rangeStart = prevWeekStart < monthStart ? prevWeekStart : monthStart;
+  const weekEnd = addDays(weekStart, 6);
 
   const activities = useActivitiesRange(rangeStart, today);
+  const weekRatings = useDayRatingsRange(weekStart, weekEnd);
 
   const derived = useMemo(() => {
-    if (!activities || !categories) return undefined;
+    if (!activities || !categories || !weekRatings) return undefined;
     const monthActivities = filterByDateRange(activities, monthStart, today);
+    const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
     return {
       weekly: getWeeklySummary(activities, categories, weekStart),
       compare: getWeekToDateComparison(activities, categories, { weekStart, today }),
       cards: buildInsightCards(activities, categories, { weekStart, today }),
       monthly: getMonthlySummary(monthActivities, categories, monthStart),
       analytics: getActivityAnalytics(monthActivities),
+      ratingTrend: getRatingTrend(weekRatings, weekDays),
     };
-  }, [activities, categories, weekStart, monthStart, today]);
+  }, [activities, categories, weekStart, monthStart, today, weekRatings]);
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 px-4 py-8 sm:px-8">
@@ -60,6 +67,7 @@ export default function InsightsPage() {
         <LoadingSkeleton />
       ) : (
         <>
+          <RatingTrend trend={derived.ratingTrend} />
           <WeeklyOverviewChart {...derived.weekly} categories={categories} />
           <ComparePanel result={derived.compare} categories={categories} />
           <InsightCards cards={derived.cards} />

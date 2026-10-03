@@ -67,6 +67,7 @@ users/{uid}                    UserProfile: displayName, email, photoURL, create
 users/{uid}/activities/{id}    Activity — `id` field = doc id
 users/{uid}/categories/{id}    custom Category only (isDefault: false)
 users/{uid}/goals/habits       HabitGoals — one fixed-id doc, the onboarding questionnaire's answers
+users/{uid}/dayRatings/{date}  DayRating — doc id is the IsoDate, one 5-point rating per day
 ```
 
 ```ts
@@ -120,6 +121,29 @@ area) right after migration; `skipped`/`in-progress` show a dismissible Home ban
 'completed'`. Slices 4–5 (warnings, % hiệu quả) are the only consumers planned so far —
 `useHabitGoals()` is the live read.
 
+**Daily satisfaction rating** (`architecture/ADR-009-daily-feedback-and-parent-view.md`, slice 3 —
+rating only; warnings, % hiệu quả, AI comments and the parent view are the rest of ADR-009, not
+built yet) — one 5-point score + optional note per day, `users/{uid}/dayRatings/{date}` (doc id is
+the `IsoDate`, so the date isn't stored as a field):
+
+```ts
+interface DayRating {
+  score: 1 | 2 | 3 | 4 | 5;
+  note?: string;   // ≤ 280 chars, optional, private
+  updatedAt: number;
+}
+```
+
+`build-day-rating.ts`'s `buildDayRating` validates and assembles the document; `isDayRatable(date,
+today)` (D2) allows today and the previous 7 days, which `DayRatingCard` uses to decide whether a
+day is editable or read-only. One tap on an emoji saves the score immediately (carrying whatever
+note is drafted); the note itself needs an explicit Save. `useDayRating(date)` is the live
+single-day read (Home, History); `useDayRatingsRange(start, end)` queries by `documentId()` (the
+doc id is the date, so a lexicographic range works exactly like a `date` field range, no composite
+index) and feeds `get-rating-trend.ts`'s `getRatingTrend`, which pairs each day in a week with its
+score (`null` when untracked, excluded from the average per D7) — rendered by `RatingTrend` as
+Insights' "How your days felt" section.
+
 **Cross-midnight activities** (v2 slice 1) are stored as two per-day docs: a head `start–1440` on
 the start date and a tail `0–end` on the next day, both with `spanId` = the head's `id`; the
 tail's id is `${headId}-next`. Every row lives on one `date`, so the daily/weekly/monthly helpers
@@ -147,11 +171,13 @@ Layers:
    `plan-dexie-migration.ts`, …) — plain arrays in, plain values out. This is the unit-tested
    surface.
 
-**Security Rules** (`firestore.rules`, spec in `tests/rules/firestore.rules.test.ts` and
-`tests/rules/habit-goals.test.ts`): each user reads/writes only `users/{uid}/**`; documents must
-match the shapes above (key allowlists, `id` = doc id, date format, integer minutes, name limits
-mirroring the builders: activity 200, category 50; `goals/habits` mirrors `build-habit-goals.ts`'s
-D6 ranges, including the ≤24h planned-total check). Deployed by the owner
+**Security Rules** (`firestore.rules`, spec in `tests/rules/firestore.rules.test.ts`,
+`tests/rules/habit-goals.test.ts` and `tests/rules/day-rating.test.ts`): each user reads/writes
+only `users/{uid}/**`; documents must match the shapes above (key allowlists, `id` = doc id, date
+format, integer minutes, name limits mirroring the builders: activity 200, category 50;
+`goals/habits` mirrors `build-habit-goals.ts`'s D6 ranges, including the ≤24h planned-total check;
+`dayRatings/{date}` requires the doc id to match `YYYY-MM-DD`, an integer score 1-5, and a note ≤
+280 chars, mirroring `build-day-rating.ts`). Deployed by the owner
 (`pnpm exec firebase deploy --only firestore:rules`), not by CI.
 
 **One-time migration from Dexie** (`lib/migrate-local-data.ts`): pre-F2 builds kept everything
@@ -236,12 +262,12 @@ No state library.
 
 | Layer | Tool | What we test |
 |-------|------|--------------|
-| Unit | Vitest (`pnpm test`) | Pure helpers on plain arrays — summaries, builders (incl. name caps), `planDexieMigration` (0/500/501/600 ops, pairs at the boundary, skips, remaps, re-run = nothing), profile, given name, converters, sync status, `buildHabitGoals` (D6 boundaries), `getDayBudget`, `getWakeTime`, `suggestedHabitGoals`, default categories |
+| Unit | Vitest (`pnpm test`) | Pure helpers on plain arrays — summaries, builders (incl. name caps), `planDexieMigration` (0/500/501/600 ops, pairs at the boundary, skips, remaps, re-run = nothing), profile, given name, converters, sync status, `buildHabitGoals` (D6 boundaries), `getDayBudget`, `getWakeTime`, `suggestedHabitGoals`, default categories, `buildDayRating`/`isDayRatable` (D2 window, score/note boundaries), `getRatingTrend` (D7 untracked days excluded) |
 | Integration (Dexie) | Vitest + `fake-indexeddb` | The frozen migration source: schema, seed (still only the original four categories), indexes, v1 → v2 upgrade |
-| Rules | `@firebase/rules-unit-testing` on the Firestore emulator (`pnpm test:emulator`) | Owner-only access on all four paths; malformed profiles/activities/categories/habit goals rejected |
-| Integration (Firestore) | Real SDK on the Auth/Firestore emulators (`pnpm test:emulator`) | Writes at the §2.4 paths, span batches, range query, two devices on one account, migration (600 rows, progress, markers last, re-run, second account, failure), `saveHabitGoals` round-trip |
-| E2E | Playwright + emulators (`pnpm test:e2e`) | Auth gate on every route, real popup sign-in creates the profile, migration dialog, offline add + sync, sign out clears the cache, Home/History/Insights flows after sign-in, onboarding wizard (walk all steps, skip/resume, offline save, Habits & goals edits, Re-run) |
-| Accessibility | `@axe-core/playwright` | Zero violations on ①–④, ⑥, ⑧, `/privacy/`, all signed-in routes/dialogs, and the onboarding wizard/banner/Habits & goals page |
+| Rules | `@firebase/rules-unit-testing` on the Firestore emulator (`pnpm test:emulator`) | Owner-only access on all five paths; malformed profiles/activities/categories/habit goals/day ratings rejected |
+| Integration (Firestore) | Real SDK on the Auth/Firestore emulators (`pnpm test:emulator`) | Writes at the §2.4 paths, span batches, range query, two devices on one account, migration (600 rows, progress, markers last, re-run, second account, failure), `saveHabitGoals` round-trip, `saveDayRating` round-trip + `documentId()` range query |
+| E2E | Playwright + emulators (`pnpm test:e2e`) | Auth gate on every route, real popup sign-in creates the profile, migration dialog, offline add + sync, sign out clears the cache, Home/History/Insights flows after sign-in, onboarding wizard (walk all steps, skip/resume, offline save, Habits & goals edits, Re-run), daily rating (tap saves + reload, note Save, History shows it, Insights trend + average) |
+| Accessibility | `@axe-core/playwright` | Zero violations on ①–④, ⑥, ⑧, `/privacy/`, all signed-in routes/dialogs, the onboarding wizard/banner/Habits & goals page, and Home/History/Insights with a day rated |
 | Hosting | Playwright + Firebase Hosting emulator (`pnpm test:e2e:hosting`) | `firebase.json` routes (sign-in screen signed out), redirects, 404, cache headers, manifest scope |
 | Lighthouse | Local, on demand | Spot-check; no CI gate |
 
@@ -291,3 +317,11 @@ adding them is the Implement/Test agents' job, guided by the plan the Plan agent
   Pure helpers `buildHabitGoals`, `suggestedHabitGoals`, `getDayBudget`, `getWakeTime`; Firestore
   doc `users/{uid}/goals/habits` + Security Rules. Feeds slices 4 (warnings) and 5 (% hiệu quả),
   not yet built.
+- **v2 slice 3 — daily satisfaction rating (built on `feat/slice3-day-rating`;
+  `architecture/ADR-009-daily-feedback-and-parent-view.md`, rating only):** `DayRatingCard` on Home
+  ("How was your day?", 5-emoji scale + optional note ≤ 280 chars) and reused on History for the
+  selected day; `RatingTrend` on Insights ("How your days felt", one emoji per day this week, "–"
+  for untracked days, average over rated days). Editable for today and the previous 7 days (D2).
+  Pure helpers `buildDayRating`, `isDayRatable`, `getRatingTrend`; Firestore doc
+  `users/{uid}/dayRatings/{date}` + Security Rules. The rest of ADR-009 (warnings, rule-based/AI
+  comments, % hiệu quả, welcome-back dialog, parent view) is not built yet.

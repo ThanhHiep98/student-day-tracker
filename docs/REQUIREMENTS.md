@@ -139,7 +139,11 @@ Slice 2 — "Ở lần đầu tiên, đưa ra các gợi ý đề habit … đ�
 pending review/merge, via `architecture/ADR-008-onboarding-habits.md`: a first-run wizard asks five questions (sleep,
 school, study outside class, meals, entertainment), each prefilled with a lớp-12 suggestion; a
 review screen shows the 24h budget; skipping leaves a Home banner; answers are editable anytime on
-`/goals`. Still to come: the warnings/nhận xét and % hiệu quả lines ("sẽ đưa ra cảnh báo…", "tính %
-hiệu quả…") and the end-of-day satisfaction rating — slices 4–5, designed in
-`architecture/ADR-009-daily-feedback-and-parent-view.md` (in review). The sticker/nhãn dán request
-and parent view are also ADR-009.
+`/goals`. Slice 3 — "Đánh giá mức độ hài lòng trong ngày" — built on `feat/slice3-day-rating` via
+`architecture/ADR-009-daily-feedback-and-parent-view.md` §1.2/§2 (rating only; warnings, % hiệu
+quả, AI comments and the parent view are the rest of ADR-009, still to come): a "How was your
+day?" card on Home (5-emoji scale + optional note ≤ 280 chars, editable for today and the previous
+7 days), the same card read-only/editable on History for the selected day, and a "How your days
+felt" weekly trend on Insights — `users/{uid}/dayRatings/{date}`, `buildDayRating`,
+`getRatingTrend`. Still to come: the warnings/nhận xét and % hiệu quả lines ("sẽ đưa ra cảnh báo…",
+"tính % hiệu quả…") — slices 4–5. The sticker/nhãn dán request and parent view are also ADR-009.

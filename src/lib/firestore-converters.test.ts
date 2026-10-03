@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toActivity, toCategory, toHabitGoals } from './firestore-converters';
+import { toActivity, toCategory, toDayRating, toHabitGoals } from './firestore-converters';
 import { suggestedHabitGoals } from './suggested-habit-goals';
 
 describe('toActivity', () => {
@@ -56,5 +56,18 @@ describe('toHabitGoals', () => {
   it('omits completedAt when absent, keeps it when a number', () => {
     expect(toHabitGoals(stored)).not.toHaveProperty('completedAt');
     expect(toHabitGoals({ ...stored, completedAt: 3 })).toEqual({ ...stored, completedAt: 3 });
+  });
+});
+
+describe('toDayRating', () => {
+  const stored = { score: 4 as const, updatedAt: 1_700_000_000_000 };
+
+  it('keeps exactly the DayRating fields and drops unknown keys', () => {
+    expect(toDayRating({ ...stored, date: '2026-10-03', extra: true })).toEqual(stored);
+  });
+
+  it('omits note when absent, keeps it when a string', () => {
+    expect(toDayRating(stored)).not.toHaveProperty('note');
+    expect(toDayRating({ ...stored, note: 'ổn' })).toEqual({ ...stored, note: 'ổn' });
   });
 });
