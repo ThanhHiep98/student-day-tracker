@@ -151,5 +151,14 @@ cho người dùng." — built on `feat/slice4-warnings-comments` via ADR-009 §
 (icon + text, never colour alone; caps and the bedtime nudge warn live, other targets show "to go"
 mid-day and a warning only once the day ends), and a "Comments on your week" card on Insights shows
 up to three neutral, specific-numbers sentences — `evaluateDay`, `evaluateWeek`, `buildRuleComments`.
-Still to come: the % hiệu quả line ("tính % hiệu quả…") and AI comments — slice 5 and F3. The
-sticker/nhãn dán request and parent view are also ADR-009 (slices 6 and 8).
+Slice 5 — "Khi học sinh đăng nhập sẽ dựa vào chuẩn đầu vào tính % hiệu quả đưa ra nhận xét" — built
+via ADR-009 §1.2 ④⑤/§2.2 D6-D8: `getDayEfficiency`/`getWeekEfficiency` score each goal against its
+baseline (target goals `min(actual/target, 1)`; school = minutes logged in its blocks ÷ planned,
+school days only; entertainment's cap `1` at/under it else `max(0, 1 - (actual-cap)/cap)`), averaged
+into a 0-100 day/week percent that excludes untracked days and goals with nothing to score against.
+A welcome-back dialog shows once per day on the first Home load, for yesterday, only when it has
+data: the ring, per-goal bars (colored by each goal's own category), an "Up/Down from X% the day
+before" line, and one comment reused from slice 4's rule-based output. Insights gained
+"% hiệu quả · this week" above the existing comments/ratings cards. Still to come: AI comments
+(F3), the sticker/nhãn dán request (slice 6), and daily summaries + the parent view + the role
+choice (slice 8).
