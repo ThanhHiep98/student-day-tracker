@@ -15,11 +15,20 @@ import {
 import { ensureUserProfile } from '@/lib/user-profile';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
+import { DaySummaryWriter } from './day-summary-writer';
 import { MigrationDialog, type MigrationDialogState } from './migration-dialog';
 import { NavBar } from './nav-bar';
 import { OnboardingWizard } from './onboarding-wizard';
 import { SidebarNav } from './sidebar-nav';
 import { SignInScreen } from './sign-in-screen';
+
+/**
+ * ADR-009 §2.2 D16 — "only while at least one parent is linked". Parent
+ * linking is slice 8b; until then this stays `false` so `DaySummaryWriter`
+ * makes no production writes (see `docs/ARCHITECTURE.md` "Status"). 8b
+ * replaces this constant with `useParentLinks().length > 0`.
+ */
+const PARENT_SUMMARY_SHARING_ENABLED = false;
 
 /** Uids whose first-run tasks already ran in this page session. */
 const preparedUids = new Set<string>();
@@ -154,6 +163,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         </div>
       )}
       <FirstRunTasks user={user} scope={scope} />
+      <DaySummaryWriter scope={scope} enabled={PARENT_SUMMARY_SHARING_ENABLED} />
     </>
   );
 }

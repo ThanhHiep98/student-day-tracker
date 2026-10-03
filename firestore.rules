@@ -180,6 +180,45 @@ service cloud.firestore {
         && d.createdAt is number;
     }
 
+    // ADR-009 §2.3/D14/D16 slice 8a — users/{uid}/summaries/{date}, the only
+    // document a linked parent will ever be allowed to read (parent read
+    // access itself is 8b; today this is owner-only). Numbers only, mirroring
+    // build-day-summary.ts: no activity names/times, category names, notes,
+    // AI text, display name or email can fit this shape.
+    function validSummaryGoal(g) {
+      return g.keys().hasOnly(['actual', 'target', 'score'])
+        && intIn(g.actual, 0, 1440)
+        && (g.target == null || intIn(g.target, 0, 1440))
+        && (g.score == null || (g.score is number && g.score >= 0 && g.score <= 1));
+    }
+
+    function validSummaryGoals(goals) {
+      return goals.keys().hasAll(['sleep', 'school', 'extraClass', 'selfStudy', 'meals', 'entertainment'])
+        && goals.keys().hasOnly(['sleep', 'school', 'extraClass', 'selfStudy', 'meals', 'entertainment'])
+        && validSummaryGoal(goals.sleep)
+        && validSummaryGoal(goals.school)
+        && validSummaryGoal(goals.extraClass)
+        && validSummaryGoal(goals.selfStudy)
+        && validSummaryGoal(goals.meals)
+        && validSummaryGoal(goals.entertainment);
+    }
+
+    function validSummaryWarnings(warnings) {
+      return warnings is list && warnings.size() <= 10
+        && warnings.hasOnly(['sleep-short', 'bedtime-late', 'entertainment-over', 'target-missed']);
+    }
+
+    function validDaySummary(id, d) {
+      return d.keys().hasAll(['efficiency', 'goals', 'warnings', 'ratingScore', 'updatedAt'])
+        && d.keys().hasOnly(['efficiency', 'goals', 'warnings', 'ratingScore', 'updatedAt'])
+        && id.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && (d.efficiency == null || intIn(d.efficiency, 0, 100))
+        && validSummaryGoals(d.goals)
+        && validSummaryWarnings(d.warnings)
+        && (d.ratingScore == null || intIn(d.ratingScore, 1, 5))
+        && d.updatedAt is number;
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid) && validProfile(request.resource.data);
@@ -213,6 +252,14 @@ service cloud.firestore {
       match /aiComments/{date} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validAiComment(date, request.resource.data);
+      }
+
+      // ADR-009 slice 8a — owner only for now. Parent read access
+      // (`exists(/users/$(uid)/parents/$(request.auth.uid))`) is added in 8b,
+      // once the `parents` subcollection and invite flow exist.
+      match /summaries/{date} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validDaySummary(date, request.resource.data);
       }
     }
   }
