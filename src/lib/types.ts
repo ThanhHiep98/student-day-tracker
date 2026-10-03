@@ -85,3 +85,16 @@ export interface HabitGoals {
   updatedAt: number;
   completedAt?: number;
 }
+
+/**
+ * `users/{uid}/dayRatings/{IsoDate}` (ADR-009 §2.3 D1/D2) — one 5-point
+ * satisfaction rating per day, the doc id *is* the date so it isn't stored as
+ * a field. `note` is optional, trimmed, and capped at 280 characters
+ * (`build-day-rating.ts`'s `DAY_RATING_NOTE_MAX`); editable for today and the
+ * previous 7 days (D2).
+ */
+export interface DayRating {
+  score: 1 | 2 | 3 | 4 | 5;
+  note?: string;
+  updatedAt: number;
+}

@@ -1,4 +1,4 @@
-import type { Activity, Category, HabitGoals } from './types';
+import type { Activity, Category, DayRating, HabitGoals } from './types';
 
 /**
  * Shape guards between Firestore documents (or legacy Dexie rows) and the app
@@ -48,4 +48,13 @@ export function toHabitGoals(data: Record<string, unknown>): HabitGoals {
   };
   if (typeof data.completedAt === 'number') goals.completedAt = data.completedAt;
   return goals;
+}
+
+export function toDayRating(data: Record<string, unknown>): DayRating {
+  const rating: DayRating = {
+    score: data.score as DayRating['score'],
+    updatedAt: data.updatedAt as number,
+  };
+  if (typeof data.note === 'string') rating.note = data.note;
+  return rating;
 }
