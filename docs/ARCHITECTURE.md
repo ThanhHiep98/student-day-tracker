@@ -68,6 +68,8 @@ users/{uid}/activities/{id}    Activity — `id` field = doc id
 users/{uid}/categories/{id}    custom Category only (isDefault: false)
 users/{uid}/goals/habits       HabitGoals — one fixed-id doc, the onboarding questionnaire's answers
 users/{uid}/dayRatings/{date}  DayRating — doc id is the IsoDate, one 5-point rating per day
+users/{uid}/aiComments/{date}  AiComment — doc id is the IsoDate, F3's cached Gemini comment
+users/{uid}/summaries/{date}   DaySummary — doc id is the IsoDate, slice 8a; numbers only (D14)
 ```
 
 ```ts
@@ -144,6 +146,42 @@ index) and feeds `get-rating-trend.ts`'s `getRatingTrend`, which pairs each day 
 score (`null` when untracked, excluded from the average per D7) — rendered by `RatingTrend` as
 Insights' "How your days felt" section.
 
+**Daily summaries** (`architecture/ADR-009-daily-feedback-and-parent-view.md` §2.3/D14/D16, slice
+8a — "daily summaries" only; role choice, invites/links and the parent dashboard itself are slices
+8b/8c, not built) — the numbers-only document a linked parent will eventually be allowed to read,
+`users/{uid}/summaries/{date}` (doc id is the `IsoDate`):
+
+```ts
+interface DaySummary {
+  efficiency: number | null;   // 0-100, null = untracked that day (D7)
+  goals: Record<'sleep' | 'school' | 'extraClass' | 'selfStudy' | 'meals' | 'entertainment',
+                 { actual: number; target: number | null; score: number | null }>;
+  warnings: ('sleep-short' | 'bedtime-late' | 'entertainment-over' | 'target-missed')[];
+  ratingScore: number | null;  // this day's rating score only, never its note
+  updatedAt: number;
+}
+```
+
+`build-day-summary.ts`'s `buildDaySummary(evaluation, efficiency, ratingScore, updatedAt)` is the
+only place that turns slice 4/5's `evaluateDay`/`getDayEfficiency` output into this shape — by
+construction it can only read numeric fields off them, never a finding's label/message text or a
+`DayRating`'s note, so no activity name, category name, note, AI text, display name or email can
+ever reach it (unit-tested with marker strings, same technique as `build-ai-prompt.test.ts`). On a
+fully untracked day every per-goal `score` and `warnings` are forced empty/null rather than
+reporting goals as missed (D7 "don't punish not logging"), even though `evaluateDay` itself would
+still warn `target-missed` for the student's own "today vs your plan" card.
+
+`use-day-summary-writer.ts`'s `useDaySummaryWriter` decides *when* to call `saveDaySummary`
+(`summary-writes.ts`, fire-and-forget via `trackWrite`): debounced (`SUMMARY_WRITE_DEBOUNCE_MS`),
+for a caller-supplied list of dates (today + yesterday from `DaySummaryWriter`, mounted in
+`auth-gate.tsx` next to `FirstRunTasks`), whenever activities/goals/ratings actually change. D16
+("only while at least one parent is linked") doesn't have a parent-link collection yet (that's
+8b), so the writer takes a single `enabled: boolean` the caller fully controls —
+`auth-gate.tsx` currently hardcodes `PARENT_SUMMARY_SHARING_ENABLED = false`, so **no production
+writes happen yet**; the writer itself is complete and exercised in unit tests (fake timers, a
+mocked `saveDaySummary`) and an emulator integration test (`tests/emulator/summary-writes.test.ts`)
+by enabling it directly. 8b replaces the constant with `useParentLinks().length > 0`.
+
 **Cross-midnight activities** (v2 slice 1) are stored as two per-day docs: a head `start–1440` on
 the start date and a tail `0–end` on the next day, both with `spanId` = the head's `id`; the
 tail's id is `${headId}-next`. Every row lives on one `date`, so the daily/weekly/monthly helpers
@@ -172,12 +210,15 @@ Layers:
    surface.
 
 **Security Rules** (`firestore.rules`, spec in `tests/rules/firestore.rules.test.ts`,
-`tests/rules/habit-goals.test.ts` and `tests/rules/day-rating.test.ts`): each user reads/writes
-only `users/{uid}/**`; documents must match the shapes above (key allowlists, `id` = doc id, date
-format, integer minutes, name limits mirroring the builders: activity 200, category 50;
-`goals/habits` mirrors `build-habit-goals.ts`'s D6 ranges, including the ≤24h planned-total check;
-`dayRatings/{date}` requires the doc id to match `YYYY-MM-DD`, an integer score 1-5, and a note ≤
-280 chars, mirroring `build-day-rating.ts`). Deployed by the owner
+`tests/rules/habit-goals.test.ts`, `tests/rules/day-rating.test.ts`, `tests/rules/ai-comments.test.ts`
+and `tests/rules/summaries.test.ts`): each user reads/writes only `users/{uid}/**`; documents must
+match the shapes above (key allowlists, `id` = doc id, date format, integer minutes, name limits
+mirroring the builders: activity 200, category 50; `goals/habits` mirrors `build-habit-goals.ts`'s
+D6 ranges, including the ≤24h planned-total check; `dayRatings/{date}` requires the doc id to match
+`YYYY-MM-DD`, an integer score 1-5, and a note ≤ 280 chars, mirroring `build-day-rating.ts`;
+`summaries/{date}` requires the six known goal keys only, each goal's `score` 0-1 or null,
+`efficiency` 0-100 or null, `warnings` from the four known codes, `ratingScore` 1-5 or null —
+**owner read/write only for now**, parent read access is 8b). Deployed by the owner
 (`pnpm exec firebase deploy --only firestore:rules`), not by CI.
 
 **One-time migration from Dexie** (`lib/migrate-local-data.ts`): pre-F2 builds kept everything
@@ -262,10 +303,10 @@ No state library.
 
 | Layer | Tool | What we test |
 |-------|------|--------------|
-| Unit | Vitest (`pnpm test`) | Pure helpers on plain arrays — summaries, builders (incl. name caps), `planDexieMigration` (0/500/501/600 ops, pairs at the boundary, skips, remaps, re-run = nothing), profile, given name, converters, sync status, `buildHabitGoals` (D6 boundaries), `getDayBudget`, `getWakeTime`, `suggestedHabitGoals`, default categories, `buildDayRating`/`isDayRatable` (D2 window, score/note boundaries), `getRatingTrend` (D7 untracked days excluded), `getDayEfficiency`/`getWeekEfficiency` (D6 formula table incl. the cap formula, school-days-only, rounding, "No cap set" vs. "Not tracked yet"), `use-welcome-back-dialog`'s per-uid/date eligibility |
+| Unit | Vitest (`pnpm test`) | Pure helpers on plain arrays — summaries, builders (incl. name caps), `planDexieMigration` (0/500/501/600 ops, pairs at the boundary, skips, remaps, re-run = nothing), profile, given name, converters, sync status, `buildHabitGoals` (D6 boundaries), `getDayBudget`, `getWakeTime`, `suggestedHabitGoals`, default categories, `buildDayRating`/`isDayRatable` (D2 window, score/note boundaries), `getRatingTrend` (D7 untracked days excluded), `getDayEfficiency`/`getWeekEfficiency` (D6 formula table incl. the cap formula, school-days-only, rounding, "No cap set" vs. "Not tracked yet"), `use-welcome-back-dialog`'s per-uid/date eligibility, `buildDaySummary` (marker-string "numbers only", untracked/rating-only days), `useDaySummaryWriter`'s gating/debounce (fake timers, mocked write) |
 | Integration (Dexie) | Vitest + `fake-indexeddb` | The frozen migration source: schema, seed (still only the original four categories), indexes, v1 → v2 upgrade |
-| Rules | `@firebase/rules-unit-testing` on the Firestore emulator (`pnpm test:emulator`) | Owner-only access on all five paths; malformed profiles/activities/categories/habit goals/day ratings rejected |
-| Integration (Firestore) | Real SDK on the Auth/Firestore emulators (`pnpm test:emulator`) | Writes at the §2.4 paths, span batches, range query, two devices on one account, migration (600 rows, progress, markers last, re-run, second account, failure), `saveHabitGoals` round-trip, `saveDayRating` round-trip + `documentId()` range query |
+| Rules | `@firebase/rules-unit-testing` on the Firestore emulator (`pnpm test:emulator`) | Owner-only access on every path (profile, activities, categories, habit goals, day ratings, AI comments, summaries); malformed documents rejected; `summaries/{date}` additionally checks the untracked-day shape (D14) |
+| Integration (Firestore) | Real SDK on the Auth/Firestore emulators (`pnpm test:emulator`) | Writes at the §2.4 paths, span batches, range query, two devices on one account, migration (600 rows, progress, markers last, re-run, second account, failure), `saveHabitGoals` round-trip, `saveDayRating` round-trip + `documentId()` range query, `saveDaySummary` round-trip |
 | E2E | Playwright + emulators (`pnpm test:e2e`) | Auth gate on every route, real popup sign-in creates the profile, migration dialog, offline add + sync, sign out clears the cache, Home/History/Insights flows after sign-in, onboarding wizard (walk all steps, skip/resume, offline save, Habits & goals edits, Re-run), daily rating (tap saves + reload, note Save, History shows it, Insights trend + average), welcome-back dialog once-per-day (incl. staying closed across a reload without clicking "Start today") + "Rate yesterday", Insights % hiệu quả section (populated and "–" empty state) |
 | Accessibility | `@axe-core/playwright` | Zero violations on ①–④, ⑥, ⑧, `/privacy/`, all signed-in routes/dialogs, the onboarding wizard/banner/Habits & goals page, Home/History/Insights with a day rated, the welcome-back dialog (desktop + mobile, incl. the revealed rating card) and the Insights efficiency section |
 | Hosting | Playwright + Firebase Hosting emulator (`pnpm test:e2e:hosting`) | `firebase.json` routes (sign-in screen signed out), redirects, 404, cache headers, manifest scope |
@@ -393,3 +434,20 @@ adding them is the Implement/Test agents' job, guided by the plan the Plan agent
   Enforcing App Check itself (Firebase console → App Check → APIs → Firebase AI Logic → Enforce)
   stays an owner step for after this release is verified live. Daily summaries, the parent view and
   the role choice are still slice 8, the last PR.
+- **v2 slice 8a — daily summaries (built on `feat/slice8a-summaries`;
+  `architecture/ADR-009-daily-feedback-and-parent-view.md` §2.3/D14/D16; the owner split slice 8
+  into 8a daily summaries → 8b role + invite/link + cross-account rules → 8c parent dashboard):**
+  `buildDaySummary(evaluation, efficiency, ratingScore, updatedAt)` (`src/lib/build-day-summary.ts`)
+  turns slice 4/5's `evaluateDay`/`getDayEfficiency` output into the numbers-only `DaySummary` a
+  linked parent will eventually read — no activity names/times, category names, notes, AI text,
+  display name or email can reach it (marker-string unit tests), and a fully untracked day (D7)
+  nulls every per-goal score and clears `warnings` rather than reporting missed goals. New
+  Firestore doc `users/{uid}/summaries/{date}` + Security Rules (owner read/write only — parent
+  read access is 8b) + rules tests. `use-day-summary-writer.ts`'s `useDaySummaryWriter` debounces
+  the upsert (`summary-writes.ts`'s `saveDaySummary`, fire-and-forget via `trackWrite`) for today
+  and yesterday whenever activities/goals/ratings change; mounted as `DaySummaryWriter` in
+  `auth-gate.tsx` behind a hardcoded `enabled={false}` (D16 "only while at least one parent is
+  linked" — no `parents` collection exists until 8b) — **no production writes happen yet**, but the
+  writer is fully built and tested (unit tests with fake timers + a mocked `saveDaySummary`, an
+  emulator integration test exercising it directly). No UI in 8a. Role choice, invites/parent
+  links, cross-account Security Rules and the parent dashboard are 8b/8c.
