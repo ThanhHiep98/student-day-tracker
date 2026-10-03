@@ -19,10 +19,10 @@ const BAR_HEIGHT = 64;
 function DayBar({ percent }: { percent: number | null }) {
   const height = percent === null ? 0 : Math.max(2, Math.round((percent / 100) * BAR_HEIGHT));
   return (
-    <div className="flex flex-col items-center gap-1" style={{ width: 32 }}>
+    <div className="flex flex-col items-center gap-1" style={{ width: 36 }}>
       <span className="text-xs font-semibold">{percent !== null ? `${percent}%` : '–'}</span>
       <div
-        className="flex w-3 items-end overflow-hidden rounded-full bg-surface-muted"
+        className="flex w-5 items-end overflow-hidden rounded-full bg-surface-muted"
         style={{ height: BAR_HEIGHT }}
       >
         {percent !== null && (
@@ -40,7 +40,7 @@ function GoalBar({ goal, color }: { goal: WeekGoalEfficiency; color: string }) {
       <span aria-hidden className="shrink-0">
         {goal.icon}
       </span>
-      <span className="w-20 shrink-0 truncate sm:w-24">{goal.label}</span>
+      <span className="w-24 shrink-0 truncate">{goal.label}</span>
       <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted">
         <span
           className="block h-full rounded-full"

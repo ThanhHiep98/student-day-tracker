@@ -46,7 +46,7 @@ function GoalRow({ goal, color }: { goal: GoalEfficiency; color: string }) {
       <span aria-hidden className="shrink-0">
         {goal.icon}
       </span>
-      <span className="w-16 shrink-0 truncate sm:w-24">{goal.label}</span>
+      <span className="w-24 shrink-0 truncate">{goal.label}</span>
       <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted">
         <span
           className="block h-full rounded-full"
