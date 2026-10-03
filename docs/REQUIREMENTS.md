@@ -159,6 +159,14 @@ into a 0-100 day/week percent that excludes untracked days and goals with nothin
 A welcome-back dialog shows once per day on the first Home load, for yesterday, only when it has
 data: the ring, per-goal bars (colored by each goal's own category), an "Up/Down from X% the day
 before" line, and one comment reused from slice 4's rule-based output. Insights gained
-"% hiệu quả · this week" above the existing comments/ratings cards. Still to come: AI comments
-(F3), the sticker/nhãn dán request (slice 6), and daily summaries + the parent view + the role
-choice (slice 8).
+"% hiệu quả · this week" above the existing comments/ratings cards. F3 — the AI half of "Đưa ra
+nhận xét cho người dùng" — built on `feat/f3-ai-comments` via ADR-009 §1.2 ⑦⑧⑨/§2.2 D9-D12: once a
+day, with consent, Gemini (Firebase AI Logic, App Check-protected) writes the same weekly comment
+reused on Insights ("✨ Gemini" label, cached `users/{uid}/aiComments/{date}`) and in the
+welcome-back dialog; the prompt (`buildAiInput`/`buildAiPrompt`) carries only numbers — per-goal
+minutes vs. targets, day percents, the average rating, bedtime offsets — never an activity name,
+category name, note, display name or email. A consent sheet ("Get AI comments on your days?")
+gates the first call and is reversible from the account menu; offline, no consent, an App Check
+failure, a model error, or an empty response all fall back to slice 4's rule-based comments with a
+small neutral notice, never an error. Still to come: the sticker/nhãn dán request (slice 6), and
+daily summaries + the parent view + the role choice (slice 8, the last PR).

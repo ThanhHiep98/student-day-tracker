@@ -55,6 +55,9 @@ export interface UserProfile {
   privacyAcceptedAt: number;
   /** Set once this account received a device's local (Dexie) data. */
   migratedFromDexieAt?: number;
+  /** F3 AI comments (ADR-009 §2.2 D10/D12) — the consent sheet's choice,
+   * reversible any time from the account menu. Unset = never asked. */
+  aiConsent?: { granted: boolean; at: number };
 }
 
 /**
@@ -97,4 +100,18 @@ export interface DayRating {
   score: 1 | 2 | 3 | 4 | 5;
   note?: string;
   updatedAt: number;
+}
+
+/**
+ * `users/{uid}/aiComments/{IsoDate}` (ADR-009 §2.3 F3) — the Gemini weekly
+ * comment cached for one calendar day (D11: at most one call per user per
+ * day), doc id is the IsoDate it was generated for. `inputHash` identifies
+ * the `AiInput` (build-ai-input.ts) it was generated from, for debugging
+ * only — it is not re-checked to decide whether to call again.
+ */
+export interface AiComment {
+  text: string;
+  model: string;
+  inputHash: string;
+  createdAt: number;
 }

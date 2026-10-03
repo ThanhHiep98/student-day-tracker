@@ -1,4 +1,5 @@
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+import { setAiClientOverride } from './ai';
 import { StudentDayTrackerDB } from './db';
 import type { FirebaseClient } from './firebase';
 
@@ -17,6 +18,10 @@ export interface SdtTestHooks {
   /** Uid of the signed-in user (e.g. after the real popup flow), or null. */
   currentUid(): string | null;
   dexie: StudentDayTrackerDB;
+  /** F3: make the next AI call(s) resolve with `text` instead of reaching Gemini. */
+  setAiReply(text: string): void;
+  /** F3: make the next AI call(s) fail, simulating offline/quota/model errors. */
+  setAiError(): void;
 }
 
 declare global {
@@ -27,6 +32,14 @@ declare global {
 
 export function installTestHooks({ auth }: FirebaseClient): void {
   let dexie: StudentDayTrackerDB | null = null;
+  // F3: never let an emulator build reach the real Gemini API by accident —
+  // default to a failing client (exercises the rule-based fallback) until a
+  // test opts into a reply via setAiReply/setAiError.
+  setAiClientOverride({
+    generate() {
+      return Promise.reject(new Error('AI mocked by default in emulator builds'));
+    },
+  });
   window.__sdtTest = {
     async signIn(sub, email, name) {
       const credential = GoogleAuthProvider.credential(
@@ -41,6 +54,14 @@ export function installTestHooks({ auth }: FirebaseClient): void {
     get dexie() {
       dexie ??= new StudentDayTrackerDB();
       return dexie;
+    },
+    setAiReply(text) {
+      setAiClientOverride({ generate: () => Promise.resolve(text) });
+    },
+    setAiError() {
+      setAiClientOverride({
+        generate: () => Promise.reject(new Error('mock AI error')),
+      });
     },
   };
 }

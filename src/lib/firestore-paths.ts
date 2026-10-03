@@ -7,8 +7,14 @@ import {
   collection,
   doc,
 } from 'firebase/firestore';
-import { toActivity, toCategory, toDayRating, toHabitGoals } from './firestore-converters';
-import type { Activity, Category, DayRating, HabitGoals, IsoDate } from './types';
+import {
+  toActivity,
+  toAiComment,
+  toCategory,
+  toDayRating,
+  toHabitGoals,
+} from './firestore-converters';
+import type { Activity, AiComment, Category, DayRating, HabitGoals, IsoDate } from './types';
 
 /**
  * Where a signed-in user's data lives (plan §2.4):
@@ -18,6 +24,7 @@ import type { Activity, Category, DayRating, HabitGoals, IsoDate } from './types
  *   users/{uid}/categories/{id}    custom Category only (defaults live in code)
  *   users/{uid}/goals/habits       HabitGoals (ADR-008 §2.3), one fixed doc id
  *   users/{uid}/dayRatings/{date}  DayRating (ADR-009 §2.3), doc id = IsoDate
+ *   users/{uid}/aiComments/{date}  AiComment (ADR-009 §2.3 F3), doc id = IsoDate
  *
  * Every write helper takes a `UserScope`, so nothing can touch another user's
  * path by accident (and firestore.rules would reject it anyway).
@@ -45,6 +52,11 @@ const habitGoalsConverter: FirestoreDataConverter<HabitGoals> = {
 const dayRatingConverter: FirestoreDataConverter<DayRating> = {
   toFirestore: (rating) => toDayRating(rating as Record<string, unknown>) as DocumentData,
   fromFirestore: (snapshot) => toDayRating(snapshot.data()),
+};
+
+const aiCommentConverter: FirestoreDataConverter<AiComment> = {
+  toFirestore: (comment) => toAiComment(comment as Record<string, unknown>) as DocumentData,
+  fromFirestore: (snapshot) => toAiComment(snapshot.data()),
 };
 
 export function userDoc({ db, uid }: UserScope): DocumentReference {
@@ -79,4 +91,13 @@ export function dayRatingsCol({ db, uid }: UserScope): CollectionReference<DayRa
 /** `users/{uid}/dayRatings/{date}` (ADR-009 §2.3) — doc id is the IsoDate. */
 export function dayRatingDoc(scope: UserScope, date: IsoDate): DocumentReference<DayRating> {
   return doc(dayRatingsCol(scope), date);
+}
+
+export function aiCommentsCol({ db, uid }: UserScope): CollectionReference<AiComment> {
+  return collection(db, 'users', uid, 'aiComments').withConverter(aiCommentConverter);
+}
+
+/** `users/{uid}/aiComments/{date}` (ADR-009 §2.3 F3) — doc id is the IsoDate. */
+export function aiCommentDoc(scope: UserScope, date: IsoDate): DocumentReference<AiComment> {
+  return doc(aiCommentsCol(scope), date);
 }
