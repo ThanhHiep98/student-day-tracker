@@ -1,14 +1,23 @@
 'use client';
 
+import { DEFAULT_CATEGORIES } from '@/lib/default-categories';
 import type { UserScope } from '@/lib/firestore-paths';
+import { getGivenName } from '@/lib/get-given-name';
 import { migrateLocalData } from '@/lib/migrate-local-data';
 import type { AuthUser } from '@/lib/use-auth';
 import { useAuth } from '@/lib/use-auth';
+import { useCategories } from '@/lib/use-categories';
+import { useHabitGoals } from '@/lib/use-habit-goals';
+import {
+  clearOnboardingWizardRequest,
+  useOnboardingWizardRequest,
+} from '@/lib/use-onboarding-wizard';
 import { ensureUserProfile } from '@/lib/user-profile';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { MigrationDialog, type MigrationDialogState } from './migration-dialog';
 import { NavBar } from './nav-bar';
+import { OnboardingWizard } from './onboarding-wizard';
 import { SidebarNav } from './sidebar-nav';
 import { SignInScreen } from './sign-in-screen';
 
@@ -75,25 +84,76 @@ function FullPageSkeleton() {
  * Auth gate around the whole app (plan §1.3): a skeleton while Firebase
  * restores the session (a signed-in user never sees a flash of ①), the
  * sign-in screen for signed-out visitors on every route except /privacy/,
- * and the app shell once signed in.
+ * the onboarding wizard (ADR-008 §1.2 ①–⑦) in place of the whole app shell
+ * while it needs to be shown, and the app shell otherwise.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const { status, user, scope } = useAuth();
   const pathname = usePathname();
+  const goals = useHabitGoals();
+  const categories = useCategories();
+  const requestedWizardStep = useOnboardingWizardRequest();
+  // Sticky: once shown, stays open until `onDone` — the wizard's own first
+  // save flips `goals` from null to an in-progress document, which must not
+  // close the wizard out from under the student (only Skip/Save does, via
+  // onDone below).
+  const [wizardActive, setWizardActive] = useState(false);
+
+  // A stale request/open wizard from a previous account must not leak into
+  // the next sign-in.
+  useEffect(() => {
+    if (status !== 'signed-in') {
+      clearOnboardingWizardRequest();
+      setWizardActive(false);
+    }
+  }, [status]);
+
+  // `goals === null` once loaded: this account never started the
+  // questionnaire — show it right away (ADR-008 §2.4).
+  useEffect(() => {
+    if (goals === null) setWizardActive(true);
+  }, [goals]);
+
+  // Something asked for it (the Home banner's Continue, or Habits & goals'
+  // Re-run questionnaire).
+  useEffect(() => {
+    if (requestedWizardStep !== null) setWizardActive(true);
+  }, [requestedWizardStep]);
 
   if (status === 'loading') return <FullPageSkeleton />;
   if (status === 'signed-out') {
     return pathname.startsWith('/privacy') ? children : <SignInScreen />;
   }
 
+  function handleWizardDone() {
+    setWizardActive(false);
+    clearOnboardingWizardRequest();
+  }
+
+  // FirstRunTasks stays mounted at the same tree position regardless of
+  // `wizardActive` — rendering it from two different branches would remount
+  // it when the gate flips mid-migration, orphaning the dialog's state.
   return (
-    <div className="flex min-h-full">
-      <SidebarNav />
-      <div className="flex min-h-full flex-1 flex-col">
-        {children}
-        <NavBar />
-      </div>
+    <>
+      {wizardActive ? (
+        <OnboardingWizard
+          scope={scope}
+          categories={categories ?? [...DEFAULT_CATEGORIES]}
+          existing={goals ?? null}
+          startStep={requestedWizardStep ?? 0}
+          givenName={getGivenName(user.displayName, user.email)}
+          onDone={handleWizardDone}
+        />
+      ) : (
+        <div className="flex min-h-full">
+          <SidebarNav />
+          <div className="flex min-h-full flex-1 flex-col">
+            {children}
+            <NavBar />
+          </div>
+        </div>
+      )}
       <FirstRunTasks user={user} scope={scope} />
-    </div>
+    </>
   );
 }

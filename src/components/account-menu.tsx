@@ -123,6 +123,9 @@ export function SidebarAccount() {
           </div>
           <hr className="border-border" />
           <SyncStatusLine className="px-3 py-2.5" />
+          <Link href="/goals/" onClick={() => setOpen(false)} className={MENU_ITEM}>
+            Habits &amp; goals
+          </Link>
           <Link href="/privacy/" onClick={() => setOpen(false)} className={MENU_ITEM}>
             Privacy notice
           </Link>
@@ -233,6 +236,13 @@ export function MobileAccountButton({ className = '' }: { className?: string }) 
         <SyncStatusLine className="mt-4" />
         <hr className="my-4 border-border" />
         <ThemeToggle variant="switch" />
+        <Link
+          href="/goals/"
+          onClick={() => setOpen(false)}
+          className="flex min-h-11 items-center rounded-lg px-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900 dark:focus-visible:outline-zinc-100"
+        >
+          Habits &amp; goals
+        </Link>
         <Link
           href="/privacy/"
           onClick={() => setOpen(false)}

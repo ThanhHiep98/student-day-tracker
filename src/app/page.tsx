@@ -8,6 +8,7 @@ import { DailyDonutChart } from '@/components/daily-donut-chart';
 import { DailySummaryCard } from '@/components/daily-summary-card';
 import { InstallBanner } from '@/components/install-banner';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
+import { OnboardingBanner } from '@/components/onboarding-banner';
 import { RecentActivityRail } from '@/components/recent-activity-rail';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TipCard } from '@/components/tip-card';
@@ -29,6 +30,7 @@ import type { Activity, Category } from '@/lib/types';
 import { useActivities } from '@/lib/use-activities';
 import { useAuth } from '@/lib/use-auth';
 import { useCategories } from '@/lib/use-categories';
+import { useHabitGoals } from '@/lib/use-habit-goals';
 import { useInstallPrompt } from '@/lib/use-install-prompt';
 import { useState } from 'react';
 
@@ -60,6 +62,7 @@ export default function Home() {
   const today = toIsoDate(new Date());
   const activities = useActivities(today);
   const categories = useCategories();
+  const habitGoals = useHabitGoals();
   const { canInstall, install, dismiss } = useInstallPrompt();
   const { user, scope } = useAuth();
   const givenName = user ? getGivenName(user.displayName, user.email) : null;
@@ -150,6 +153,9 @@ export default function Home() {
       </header>
 
       {canInstall && <InstallBanner onInstall={install} onDismiss={dismiss} />}
+      {habitGoals && habitGoals.status !== 'completed' && (
+        <OnboardingBanner lastStep={habitGoals.lastStep} />
+      )}
 
       {activities === undefined || categories === undefined ? (
         <LoadingSkeleton />

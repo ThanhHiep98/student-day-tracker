@@ -121,7 +121,7 @@ midnight — slice 1). Green hint with the lớp 12 suggestion. “Counts toward
 | ③ School | ④ Study | ⑤ Meals | ⑥ Entertainment |
 |---|---|---|---|
 | ![③ School days Mon–Sat, morning 07:00–11:30, afternoon 13:30–16:30, total 7h 30m](./assets/adr-008/03-q2-school-mobile.webp) | ![④ Extra class 2h and self-study 3h, each with its category, suggestion 4–5h total](./assets/adr-008/04-q3-study-mobile.webp) | ![⑤ Meals 1h 30m with chips](./assets/adr-008/05-q4-meals-mobile.webp) | ![⑥ Entertainment at most 1h 30m, chips incl. No limit, primary button Review](./assets/adr-008/06-q5-entertainment-mobile.webp) |
-| Weekday chips; up to two time blocks (morning / afternoon); total per school day shown live. | Two steppers: **học thêm** and **tự học**, each mapped to its own category. | Total meal time per day, chips 1h / 1h 30m / 2h. | A **cap** (“at most”), not a target; “No limit” allowed. Button reads **Review**. |
+| Weekday chips; two fixed time blocks (morning / afternoon — owner accepted the fixed pair 2026-10-04); total per school day shown live. | Two steppers: **học thêm** and **tự học**, each mapped to its own category. | Total meal time per day, chips 1h / 1h 30m / 2h. | A **cap** (“at most”), not a target; “No limit” allowed. Button reads **Review**. |
 
 #### ⑦ Review — desktop
 
@@ -141,6 +141,8 @@ offered — it disappears once the plan is saved.
 #### ⑨ Habits & goals page — desktop
 
 ![⑨ Habits & goals page: six rows with icon, label, “Counts toward …”, editable value; buttons Re-run questionnaire and Save](./assets/adr-008/09-habits-goals-desktop.webp)
+
+> **Owner decision 2026-10-04:** the built page reuses the wizard's +/− steppers and inputs per row instead of the single compact value box shown here — accepted.
 
 Same data as the wizard in one form, opened from the account menu (new item “Habits & goals” in F2’s ⑥ / ⑧). Changes
 apply from the day they are saved (D8).

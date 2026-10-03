@@ -66,6 +66,7 @@ users/{uid}                    UserProfile: displayName, email, photoURL, create
                                privacyAcceptedAt (= createdAt), optional migratedFromDexieAt
 users/{uid}/activities/{id}    Activity — `id` field = doc id
 users/{uid}/categories/{id}    custom Category only (isDefault: false)
+users/{uid}/goals/habits       HabitGoals — one fixed-id doc, the onboarding questionnaire's answers
 ```
 
 ```ts
@@ -81,9 +82,43 @@ interface Activity {
 }
 ```
 
-The four **default categories** (Work / Study / Exercise / Entertainment) live in code
-(`lib/default-categories.ts`) and are never stored; `useCategories` returns them followed by the
-user's stored custom categories (sorted by `createdAt`).
+The **default categories** live in code (`lib/default-categories.ts`) and are never stored;
+`useCategories` returns them followed by the user's stored custom categories (sorted by
+`createdAt`): the original four (Work / Study / Exercise / Entertainment) plus five more added for
+the onboarding questionnaire (ADR-008) — Sleep 😴, School 🏫, Extra class 📝, Self-study 📖,
+Meals 🍚. The frozen Dexie migration source (below) still seeds only the original four.
+
+**Onboarding habit goals** (`architecture/ADR-008-onboarding-habits.md`) — a first-run wizard asks
+five questions (sleep, school, study outside class, meals, entertainment cap) and stores the
+answers as one document, `users/{uid}/goals/habits`:
+
+```ts
+interface HabitGoals {
+  version: 1;
+  status: 'in-progress' | 'skipped' | 'completed';
+  lastStep: 0 | 1 | 2 | 3 | 4 | 5;         // resume point for the Home banner
+  sleep: { targetMinutes: number; bedtimeMinutes: number; categoryId: string };
+  school: { days: number[]; blocks: { startMinutes: number; endMinutes: number }[]; categoryId: string };
+  extraClass: { targetMinutesPerDay: number; categoryId: string };
+  selfStudy: { targetMinutesPerDay: number; categoryId: string };
+  meals: { targetMinutesPerDay: number; categoryId: string };
+  entertainment: { maxMinutesPerDay: number | null; categoryId: string }; // null = no limit
+  createdAt: number; updatedAt: number; completedAt?: number;
+}
+```
+
+Every section always has a value — the D3 "lớp 12" suggestion (`suggested-habit-goals.ts`) until
+the student edits it — so the document is valid (`build-habit-goals.ts`) at every step, and
+skipping/resuming never meets a blank field. `get-day-budget.ts` turns the six sections into the
+review screen's 24h stacked bar (segment per goal, free time left, the "tight day" / "over 24h"
+flags); `get-wake-time.ts` derives the wake-up time from bedtime + sleep target (reuses the
+cross-midnight minutes-of-day math). The gate lives in `auth-gate.tsx`: a signed-in user with no
+`goals/habits` doc sees the wizard full-page (replacing the whole app shell, not just the main
+area) right after migration; `skipped`/`in-progress` show a dismissible Home banner instead
+("Continue (n of 5)"); `completed` shows neither. The same six fields are editable anytime on
+`/goals` ("Habits & goals", linked from the account menu), which always writes `status:
+'completed'`. Slices 4–5 (warnings, % hiệu quả) are the only consumers planned so far —
+`useHabitGoals()` is the live read.
 
 **Cross-midnight activities** (v2 slice 1) are stored as two per-day docs: a head `start–1440` on
 the start date and a tail `0–end` on the next day, both with `spanId` = the head's `id`; the
@@ -112,11 +147,12 @@ Layers:
    `plan-dexie-migration.ts`, …) — plain arrays in, plain values out. This is the unit-tested
    surface.
 
-**Security Rules** (`firestore.rules`, spec in `tests/rules/firestore.rules.test.ts`): each user
-reads/writes only `users/{uid}/**`; documents must match the shapes above (key allowlists, `id`
-= doc id, date format, integer minutes, name limits mirroring the builders: activity 200,
-category 50). Deployed by the owner (`pnpm exec firebase deploy --only firestore:rules`), not by
-CI.
+**Security Rules** (`firestore.rules`, spec in `tests/rules/firestore.rules.test.ts` and
+`tests/rules/habit-goals.test.ts`): each user reads/writes only `users/{uid}/**`; documents must
+match the shapes above (key allowlists, `id` = doc id, date format, integer minutes, name limits
+mirroring the builders: activity 200, category 50; `goals/habits` mirrors `build-habit-goals.ts`'s
+D6 ranges, including the ≤24h planned-total check). Deployed by the owner
+(`pnpm exec firebase deploy --only firestore:rules`), not by CI.
 
 **One-time migration from Dexie** (`lib/migrate-local-data.ts`): pre-F2 builds kept everything
 in a local Dexie database (`lib/db.ts`, now **frozen at `version(2)`** and only read). On the
@@ -200,12 +236,12 @@ No state library.
 
 | Layer | Tool | What we test |
 |-------|------|--------------|
-| Unit | Vitest (`pnpm test`) | Pure helpers on plain arrays — summaries, builders (incl. name caps), `planDexieMigration` (0/500/501/600 ops, pairs at the boundary, skips, remaps, re-run = nothing), profile, given name, converters, sync status |
-| Integration (Dexie) | Vitest + `fake-indexeddb` | The frozen migration source: schema, seed, indexes, v1 → v2 upgrade |
-| Rules | `@firebase/rules-unit-testing` on the Firestore emulator (`pnpm test:emulator`) | Owner-only access on all three paths; malformed profiles/activities/categories rejected |
-| Integration (Firestore) | Real SDK on the Auth/Firestore emulators (`pnpm test:emulator`) | Writes at the §2.4 paths, span batches, range query, two devices on one account, migration (600 rows, progress, markers last, re-run, second account, failure) |
-| E2E | Playwright + emulators (`pnpm test:e2e`) | Auth gate on every route, real popup sign-in creates the profile, migration dialog, offline add + sync, sign out clears the cache, Home/History/Insights flows after sign-in |
-| Accessibility | `@axe-core/playwright` | Zero violations on ①–④, ⑥, ⑧, `/privacy/`, and all signed-in routes/dialogs |
+| Unit | Vitest (`pnpm test`) | Pure helpers on plain arrays — summaries, builders (incl. name caps), `planDexieMigration` (0/500/501/600 ops, pairs at the boundary, skips, remaps, re-run = nothing), profile, given name, converters, sync status, `buildHabitGoals` (D6 boundaries), `getDayBudget`, `getWakeTime`, `suggestedHabitGoals`, default categories |
+| Integration (Dexie) | Vitest + `fake-indexeddb` | The frozen migration source: schema, seed (still only the original four categories), indexes, v1 → v2 upgrade |
+| Rules | `@firebase/rules-unit-testing` on the Firestore emulator (`pnpm test:emulator`) | Owner-only access on all four paths; malformed profiles/activities/categories/habit goals rejected |
+| Integration (Firestore) | Real SDK on the Auth/Firestore emulators (`pnpm test:emulator`) | Writes at the §2.4 paths, span batches, range query, two devices on one account, migration (600 rows, progress, markers last, re-run, second account, failure), `saveHabitGoals` round-trip |
+| E2E | Playwright + emulators (`pnpm test:e2e`) | Auth gate on every route, real popup sign-in creates the profile, migration dialog, offline add + sync, sign out clears the cache, Home/History/Insights flows after sign-in, onboarding wizard (walk all steps, skip/resume, offline save, Habits & goals edits, Re-run) |
+| Accessibility | `@axe-core/playwright` | Zero violations on ①–④, ⑥, ⑧, `/privacy/`, all signed-in routes/dialogs, and the onboarding wizard/banner/Habits & goals page |
 | Hosting | Playwright + Firebase Hosting emulator (`pnpm test:e2e:hosting`) | `firebase.json` routes (sign-in screen signed out), redirects, 404, cache headers, manifest scope |
 | Lighthouse | Local, on demand | Spot-check; no CI gate |
 
@@ -247,3 +283,11 @@ adding them is the Implement/Test agents' job, guided by the plan the Plan agent
   empty; the `demo-` id prefix only marks local rows the migration skips.
 - **Deferred:** renaming/deleting custom categories, editing from History, overlap detection,
   in-app account deletion (F2 Q2).
+- **v2 slice 2 — onboarding habit questionnaire (built; `architecture/ADR-008-onboarding-habits.md`):**
+  first-run wizard (welcome → 5 questions → review, `components/onboarding-wizard.tsx` +
+  `components/onboarding/*.tsx`) gated in `auth-gate.tsx`; Home banner when skipped/unfinished
+  (`onboarding-banner.tsx`); `/goals` "Habits & goals" page to edit anytime, linked from the
+  account menu. Five new default categories (Sleep, School, Extra class, Self-study, Meals).
+  Pure helpers `buildHabitGoals`, `suggestedHabitGoals`, `getDayBudget`, `getWakeTime`; Firestore
+  doc `users/{uid}/goals/habits` + Security Rules. Feeds slices 4 (warnings) and 5 (% hiệu quả),
+  not yet built.

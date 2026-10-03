@@ -31,8 +31,13 @@ export class StudentDayTrackerDB extends Dexie {
       activities: 'id, date, categoryId, [date+categoryId], spanId',
     });
 
+    // Frozen along with the schema (CLAUDE.md): this seeded the original four
+    // defaults for a pre-F2 install. ADR-008's five habit categories are
+    // code-only (never written to Firestore either) and must not be added
+    // here, or a device that never signed in would seed nine rows into a
+    // schema this file promises not to change.
     this.on('populate', () => {
-      this.categories.bulkAdd(DEFAULT_CATEGORIES as Category[]);
+      this.categories.bulkAdd(DEFAULT_CATEGORIES.slice(0, 4) as Category[]);
     });
   }
 }

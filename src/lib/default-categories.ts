@@ -23,4 +23,26 @@ export const DEFAULT_CATEGORIES: readonly Category[] = [
     isDefault: true,
     createdAt: 3,
   },
+  // ADR-008 §2.3 (onboarding habit questionnaire, D-B iii): new defaults that
+  // back the five goal areas the wizard asks about. Kept out of the
+  // questionnaire itself is "Work" (D9) — existing migrated data stays valid.
+  { id: 'sleep', name: 'Sleep', color: '#7c3aed', icon: '😴', isDefault: true, createdAt: 4 },
+  { id: 'school', name: 'School', color: '#0284c7', icon: '🏫', isDefault: true, createdAt: 5 },
+  {
+    id: 'extra-class',
+    name: 'Extra class',
+    color: '#ea580c',
+    icon: '📝',
+    isDefault: true,
+    createdAt: 6,
+  },
+  {
+    id: 'self-study',
+    name: 'Self-study',
+    color: '#0d9488',
+    icon: '📖',
+    isDefault: true,
+    createdAt: 7,
+  },
+  { id: 'meals', name: 'Meals', color: '#65a30d', icon: '🍚', isDefault: true, createdAt: 8 },
 ];

@@ -56,3 +56,32 @@ export interface UserProfile {
   /** Set once this account received a device's local (Dexie) data. */
   migratedFromDexieAt?: number;
 }
+
+/**
+ * `users/{uid}/goals/habits` (ADR-008 §2.3) — the onboarding questionnaire's
+ * answers: the student's "chuẩn đầu vào" (baseline) that later slices (4
+ * warnings, 5 % hiệu quả) read. One document per user, overwritten on every
+ * save (D8 — no history). Times are minutes since midnight, durations in
+ * minutes, timestamps in ms. `lastStep` is the wizard's resume point for the
+ * Home banner (0 = not started / just skipped at welcome).
+ */
+export interface HabitGoals {
+  version: 1;
+  status: 'in-progress' | 'skipped' | 'completed';
+  lastStep: 0 | 1 | 2 | 3 | 4 | 5;
+  sleep: { targetMinutes: number; bedtimeMinutes: number; categoryId: string };
+  /** `days`: 1 = Mon … 7 = Sun. Up to two blocks (morning / afternoon). */
+  school: {
+    days: number[];
+    blocks: { startMinutes: number; endMinutes: number }[];
+    categoryId: string;
+  };
+  extraClass: { targetMinutesPerDay: number; categoryId: string };
+  selfStudy: { targetMinutesPerDay: number; categoryId: string };
+  meals: { targetMinutesPerDay: number; categoryId: string };
+  /** A cap, not a target; `null` means "no limit" (D3/D6). */
+  entertainment: { maxMinutesPerDay: number | null; categoryId: string };
+  createdAt: number;
+  updatedAt: number;
+  completedAt?: number;
+}

@@ -9,6 +9,7 @@ import {
   openSignedIn,
   seedDexie,
   signInAs,
+  skipOnboarding,
   waitForTestHooks,
 } from './support/emulator';
 
@@ -106,6 +107,7 @@ test.describe('real Google button', () => {
     await popup.locator('#sign-in').click();
     await closed;
 
+    await skipOnboarding(page);
     await expect(greeting(page)).toBeVisible({ timeout: 20_000 });
     const uid = await page.evaluate(() => (window as HookWindow).__sdtTest?.currentUid() ?? null);
     expect(uid).not.toBeNull();
@@ -331,7 +333,9 @@ test('first sign-in on a device with local data moves it into the account with โ
     await route.continue().catch(() => undefined);
   });
 
-  const user = await signInAs(page);
+  // Migration races the onboarding wizard (ADR-008 ยง2.4) โ€” observe the
+  // migration dialog directly rather than through signInAs's default skip.
+  const user = await signInAs(page, { waitForHome: false });
   const dialog = page.getByRole('dialog', { name: 'Moving your activities to your account' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(/We found 4 activities and 1 custom category/)).toBeVisible();
@@ -340,6 +344,7 @@ test('first sign-in on a device with local data moves it into the account with โ
   release();
   await expect(dialog).toBeHidden({ timeout: 30_000 });
   await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await skipOnboarding(page);
 
   await expect(timeline(page).getByText('Old revision')).toBeVisible();
   await expect(timeline(page).getByText('Old piano')).toBeVisible();

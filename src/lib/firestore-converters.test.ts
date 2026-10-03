@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { toActivity, toCategory } from './firestore-converters';
+import { toActivity, toCategory, toHabitGoals } from './firestore-converters';
+import { suggestedHabitGoals } from './suggested-habit-goals';
 
 describe('toActivity', () => {
   const stored = {
@@ -35,5 +36,25 @@ describe('toCategory', () => {
       createdAt: 7,
     };
     expect(toCategory({ ...category, foo: 'bar' })).toEqual(category);
+  });
+});
+
+describe('toHabitGoals', () => {
+  const stored = {
+    version: 1 as const,
+    status: 'completed' as const,
+    lastStep: 5 as const,
+    ...suggestedHabitGoals(),
+    createdAt: 1,
+    updatedAt: 2,
+  };
+
+  it('keeps exactly the HabitGoals fields and drops unknown keys', () => {
+    expect(toHabitGoals({ ...stored, extra: 'x' })).toEqual(stored);
+  });
+
+  it('omits completedAt when absent, keeps it when a number', () => {
+    expect(toHabitGoals(stored)).not.toHaveProperty('completedAt');
+    expect(toHabitGoals({ ...stored, completedAt: 3 })).toEqual({ ...stored, completedAt: 3 });
   });
 });

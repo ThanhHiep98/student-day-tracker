@@ -27,8 +27,21 @@ export async function waitForTestHooks(page: Page): Promise<void> {
 }
 
 /**
+ * Dismiss the onboarding wizard (ADR-008) that every fresh account sees right
+ * after sign-in + migration. Most tests don't exercise it — `signInAs`'s
+ * default `waitForHome: true` calls this for them; onboarding.spec.ts drives
+ * the wizard directly instead of calling this.
+ */
+export async function skipOnboarding(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Skip for now' }).click();
+}
+
+/**
  * Sign the current page in as a brand-new fake Google user (unique per call)
  * and wait for Home. `page` must already show the app (e.g. after goto('/')).
+ * A fresh account always sees the onboarding wizard ① first (ADR-008); pass
+ * `waitForHome: false` to observe that (or something layered over it, like
+ * the migration dialog) instead of skipping straight through.
  */
 export async function signInAs(
   page: Page,
@@ -43,6 +56,7 @@ export async function signInAs(
   );
   expect(uid).not.toBe('');
   if (waitForHome) {
+    await skipOnboarding(page);
     await expect(
       page.getByRole('heading', { name: /good (morning|afternoon|evening)/i })
     ).toBeVisible();

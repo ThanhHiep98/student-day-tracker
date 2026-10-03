@@ -62,6 +62,92 @@ service cloud.firestore {
         && d.createdAt is number;
     }
 
+    // ADR-008 §2.3/§2.6 — users/{uid}/goals/habits. Field limits mirror the D6
+    // ranges enforced by build-habit-goals.ts.
+    function validTimeBlock(b) {
+      return b.keys().hasOnly(['startMinutes', 'endMinutes'])
+        && intIn(b.startMinutes, 300, 1320)
+        && intIn(b.endMinutes, 300, 1320)
+        && b.startMinutes < b.endMinutes;
+    }
+
+    function validBlocks(blocks) {
+      return blocks is list && blocks.size() <= 2
+        && (blocks.size() < 1 || validTimeBlock(blocks[0]))
+        && (blocks.size() < 2 || validTimeBlock(blocks[1]));
+    }
+
+    function blockMinutes(b) {
+      return b.endMinutes - b.startMinutes;
+    }
+
+    function schoolMinutes(blocks) {
+      return blocks.size() == 0 ? 0
+        : (blocks.size() == 1 ? blockMinutes(blocks[0])
+                               : blockMinutes(blocks[0]) + blockMinutes(blocks[1]));
+    }
+
+    function validSleep(d) {
+      return d.keys().hasOnly(['targetMinutes', 'bedtimeMinutes', 'categoryId'])
+        && intIn(d.targetMinutes, 240, 720)
+        && intIn(d.bedtimeMinutes, 0, 1439)
+        && str(d.categoryId, 1, 100);
+    }
+
+    function validSchool(d) {
+      return d.keys().hasOnly(['days', 'blocks', 'categoryId'])
+        && d.days is list && d.days.size() <= 7 && d.days.hasOnly([1, 2, 3, 4, 5, 6, 7])
+        && validBlocks(d.blocks)
+        && str(d.categoryId, 1, 100);
+    }
+
+    function validExtraClass(d) {
+      return d.keys().hasOnly(['targetMinutesPerDay', 'categoryId'])
+        && intIn(d.targetMinutesPerDay, 0, 480)
+        && str(d.categoryId, 1, 100);
+    }
+
+    function validSelfStudy(d) {
+      return d.keys().hasOnly(['targetMinutesPerDay', 'categoryId'])
+        && intIn(d.targetMinutesPerDay, 0, 600)
+        && str(d.categoryId, 1, 100);
+    }
+
+    function validMeals(d) {
+      return d.keys().hasOnly(['targetMinutesPerDay', 'categoryId'])
+        && intIn(d.targetMinutesPerDay, 15, 240)
+        && str(d.categoryId, 1, 100);
+    }
+
+    function validEntertainment(d) {
+      return d.keys().hasOnly(['maxMinutesPerDay', 'categoryId'])
+        && (d.maxMinutesPerDay == null || intIn(d.maxMinutesPerDay, 0, 720))
+        && str(d.categoryId, 1, 100);
+    }
+
+    function validHabitGoals(d) {
+      return d.keys().hasAll(['version', 'status', 'lastStep', 'sleep', 'school', 'extraClass',
+                              'selfStudy', 'meals', 'entertainment', 'createdAt', 'updatedAt'])
+        && d.keys().hasOnly(['version', 'status', 'lastStep', 'sleep', 'school', 'extraClass',
+                             'selfStudy', 'meals', 'entertainment', 'createdAt', 'updatedAt',
+                             'completedAt'])
+        && d.version == 1
+        && d.status in ['in-progress', 'skipped', 'completed']
+        && intIn(d.lastStep, 0, 5)
+        && validSleep(d.sleep)
+        && validSchool(d.school)
+        && validExtraClass(d.extraClass)
+        && validSelfStudy(d.selfStudy)
+        && validMeals(d.meals)
+        && validEntertainment(d.entertainment)
+        && d.createdAt is number
+        && d.updatedAt is number
+        && (!('completedAt' in d) || d.completedAt is number)
+        // D6: planned total excl. entertainment <= 24h.
+        && (d.sleep.targetMinutes + schoolMinutes(d.school.blocks) + d.extraClass.targetMinutesPerDay
+            + d.selfStudy.targetMinutesPerDay + d.meals.targetMinutesPerDay) <= 1440;
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create: if isOwner(uid) && validProfile(request.resource.data);
@@ -78,6 +164,11 @@ service cloud.firestore {
       match /categories/{id} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validCategory(id, request.resource.data);
+      }
+
+      match /goals/{goalId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && goalId == 'habits' && validHabitGoals(request.resource.data);
       }
     }
   }
