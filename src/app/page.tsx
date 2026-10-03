@@ -10,6 +10,7 @@ import { DayRatingCard } from '@/components/day-rating-card';
 import { InstallBanner } from '@/components/install-banner';
 import { LoadingSkeleton } from '@/components/loading-skeleton';
 import { OnboardingBanner } from '@/components/onboarding-banner';
+import { PlanStatusCard } from '@/components/plan-status-card';
 import { RecentActivityRail } from '@/components/recent-activity-rail';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TipCard } from '@/components/tip-card';
@@ -24,11 +25,13 @@ import { buildActivity } from '@/lib/build-activity';
 import { buildCategory } from '@/lib/build-category';
 import { addCategory } from '@/lib/category-writes';
 import { DEFAULT_CATEGORIES } from '@/lib/default-categories';
+import { evaluateDay } from '@/lib/evaluate-day';
 import { getDailySummary } from '@/lib/get-daily-summary';
 import { getGivenName } from '@/lib/get-given-name';
-import { toIsoDate } from '@/lib/iso-date';
+import { addDays, toIsoDate } from '@/lib/iso-date';
 import type { Activity, Category } from '@/lib/types';
 import { useActivities } from '@/lib/use-activities';
+import { useActivitiesRange } from '@/lib/use-activities-range';
 import { useAuth } from '@/lib/use-auth';
 import { useCategories } from '@/lib/use-categories';
 import { useDayRating } from '@/lib/use-day-rating';
@@ -63,6 +66,9 @@ type FormState =
 export default function Home() {
   const today = toIsoDate(new Date());
   const activities = useActivities(today);
+  // Covers the day before too: a cross-midnight sleep span ending today has
+  // its bedtime row on yesterday (evaluate-day.ts).
+  const planActivities = useActivitiesRange(addDays(today, -1), today);
   const categories = useCategories();
   const habitGoals = useHabitGoals();
   const todayRating = useDayRating(today);
@@ -84,6 +90,10 @@ export default function Home() {
   });
 
   const summary = activities && categories ? getDailySummary(activities, categories) : undefined;
+  const dayEvaluation =
+    planActivities && habitGoals && habitGoals.status === 'completed'
+      ? evaluateDay(planActivities, habitGoals, today, now)
+      : undefined;
 
   // The auth gate only renders pages once signed in, so `scope` is set here.
   function requireScope() {
@@ -165,6 +175,7 @@ export default function Home() {
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
           <div className="flex flex-col gap-6">
+            {dayEvaluation && <PlanStatusCard evaluation={dayEvaluation} />}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
               <DailySummaryCard
                 totalMinutes={summary?.totalMinutes ?? 0}
