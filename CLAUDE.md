@@ -121,6 +121,11 @@ planning. Keep entries terse; don't restate what's already here.)*
   conditional branches, so switching branches (wizard ↔ app shell) never remounts them mid-flight.
 - **Form sections shared by a wizard and a settings page** take a `compact?: boolean` prop that
   drops the wizard-only heading/description — don't fork the component.
+- **Goal bars and rows take their colour from the goal's category** (`goalCategoryId` in
+  `evaluate-day.ts` → the category's own `color`), never a fixed per-goal palette.
+- **Once-per-day client-only flags** (e.g. the welcome-back dialog) live in `localStorage` under
+  `sdt:<feature>:{uid}:{date}` and are set the moment the UI becomes eligible, not only on dismiss,
+  so a reload never reopens it (`use-welcome-back-dialog.ts`).
 - **No real Firebase credentials in tests:** emulators run with a `demo-*` project id
   (`demo-sdt`), the AI client is injected and mocked; only deploy jobs use the
   `FIREBASE_SERVICE_ACCOUNT_*` secret. The web `firebaseConfig` is public and committed; never
