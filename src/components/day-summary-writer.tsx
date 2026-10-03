@@ -16,17 +16,19 @@ import { useMemo } from 'react';
  *
  * `enabled` is a hardcoded `false` at the call site until ADR-009 slice 8b
  * adds parent linking (D16: "only while at least one parent is linked") —
- * see `docs/ARCHITECTURE.md` "Status". The writer itself (this component,
+ * see `docs/ARCHITECTURE.md` "Status". While disabled this doesn't mount
+ * `ActiveDaySummaryWriter` at all, so it opens none of its three live
+ * queries — no extra cost on every signed-in session for a feature nobody
+ * can use yet. The writer itself (`ActiveDaySummaryWriter`,
  * `use-day-summary-writer.ts`, `build-day-summary.ts`, `summary-writes.ts`)
  * is complete and tested; only the production gate is off.
  */
-export function DaySummaryWriter({
-  scope,
-  enabled,
-}: {
-  scope: UserScope;
-  enabled: boolean;
-}) {
+export function DaySummaryWriter({ scope, enabled }: { scope: UserScope; enabled: boolean }) {
+  if (!enabled) return null;
+  return <ActiveDaySummaryWriter scope={scope} />;
+}
+
+function ActiveDaySummaryWriter({ scope }: { scope: UserScope }) {
   const today = toIsoDate(new Date());
   const yesterday = addDays(today, -1);
   // `evaluateDay` only ever compares `date < toIsoDate(now)` (date strings,
@@ -47,7 +49,7 @@ export function DaySummaryWriter({
     [ratingsRange]
   );
 
-  useDaySummaryWriter({ scope, enabled, dates, activities, goals, ratings, now });
+  useDaySummaryWriter({ scope, enabled: true, dates, activities, goals, ratings, now });
 
   return null;
 }
