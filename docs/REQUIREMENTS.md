@@ -133,4 +133,13 @@ time slot only.
 
 Section 4 is being delivered one slice at a time through the Plan → Implement → Test workflow
 (see `CLAUDE.md`). Slice 1 (cross-midnight bug fix) shipped 2026-10-03; F1 (Firebase Hosting) is live at
-https://student-day-tracker.web.app; D-A (login) is resolved by ADR-007 (Firebase, F1–F3); D-B (goal ↔ category mapping) decided 2026-10-03 = option (iii).
+https://student-day-tracker.web.app; F2 (account + Google sign-in) shipped 2026-10-03; D-A (login) is
+resolved by ADR-007 (Firebase, F1–F3); D-B (goal ↔ category mapping) decided 2026-10-03 = option (iii).
+Slice 2 — "Ở lần đầu tiên, đưa ra các gợi ý đề habit … đặt khoảng 5 câu hỏi" — built 2026-10-03,
+pending review/merge, via `architecture/ADR-008-onboarding-habits.md`: a first-run wizard asks five questions (sleep,
+school, study outside class, meals, entertainment), each prefilled with a lớp-12 suggestion; a
+review screen shows the 24h budget; skipping leaves a Home banner; answers are editable anytime on
+`/goals`. Still to come: the warnings/nhận xét and % hiệu quả lines ("sẽ đưa ra cảnh báo…", "tính %
+hiệu quả…") and the end-of-day satisfaction rating — slices 4–5, designed in
+`architecture/ADR-009-daily-feedback-and-parent-view.md` (in review). The sticker/nhãn dán request
+and parent view are also ADR-009.
