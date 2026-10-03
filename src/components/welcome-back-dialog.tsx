@@ -187,7 +187,7 @@ export function WelcomeBackDialog({
 
       {comment && (
         <div className="mx-6 mb-2 rounded-2xl border border-border bg-surface-muted p-4 text-sm leading-relaxed">
-          <span className="mb-1 block text-xs font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
+          <span className="mb-1 block text-xs font-semibold tracking-wide text-zinc-600 uppercase dark:text-zinc-400">
             Rule-based
           </span>
           {comment}

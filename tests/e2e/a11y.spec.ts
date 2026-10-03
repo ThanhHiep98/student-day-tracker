@@ -251,6 +251,93 @@ test.describe('signed in', () => {
     await expect(page.getByRole('region', { name: 'Comments on your week' })).toBeVisible();
     await expectNoViolations(page);
   });
+
+  test('Home has no accessibility violations with the welcome-back dialog open (ADR-009 ④, slice 5)', async ({
+    page,
+  }) => {
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
+    const yesterday = await page.evaluate(() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await seedActivities(user.uid, [
+      {
+        id: 'y-sleep',
+        categoryId: 'sleep',
+        name: 'Sleep',
+        date: yesterday,
+        startMinutes: 40,
+        endMinutes: 410,
+        createdAt: 1,
+      },
+      {
+        id: 'y-entertainment',
+        categoryId: 'entertainment',
+        name: 'Gaming',
+        date: yesterday,
+        startMinutes: 600,
+        endMinutes: 730,
+        createdAt: 2,
+      },
+    ]);
+    await page.reload();
+    const dialog = page.getByRole('dialog', { name: /Yesterday/ });
+    await expect(dialog).toBeVisible();
+    await expectNoViolations(page);
+
+    await dialog.getByRole('button', { name: /Rate yesterday/ }).click();
+    await expect(dialog.getByRole('region', { name: 'How was your day?' })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('mobile Home has no accessibility violations with the welcome-back dialog open (ADR-009 ④, slice 5)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
+    const yesterday = await page.evaluate(() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await seedActivities(user.uid, [
+      {
+        id: 'y-sleep',
+        categoryId: 'sleep',
+        name: 'Sleep',
+        date: yesterday,
+        startMinutes: 40,
+        endMinutes: 410,
+        createdAt: 1,
+      },
+    ]);
+    await page.reload();
+    await expect(page.getByRole('dialog', { name: /Yesterday/ })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('/insights/ has no accessibility violations with "% hiệu quả · this week" showing (ADR-009 ⑤, slice 5)', async ({
+    page,
+  }) => {
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await seedActivities(user.uid, buildSampleWeek(today, Date.now()));
+    await page.getByRole('link', { name: 'Insights' }).click();
+    await expect(page.getByRole('region', { name: '% hiệu quả · this week' })).toBeVisible();
+    await expectNoViolations(page);
+  });
+
+  test('/insights/ has no accessibility violations in the % hiệu quả empty state (ADR-009 ⑤, slice 5)', async ({
+    page,
+  }) => {
+    await openSignedInWithGoals(page, sampleHabitGoals(Date.now()), '/insights/');
+    await expect(page.getByRole('region', { name: '% hiệu quả · this week' })).toBeVisible();
+    await expectNoViolations(page);
+  });
 });
 
 test('migration dialog ④ has no accessibility violations', async ({ page }) => {
