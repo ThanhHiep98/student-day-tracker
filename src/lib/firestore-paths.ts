@@ -12,9 +12,18 @@ import {
   toAiComment,
   toCategory,
   toDayRating,
+  toDaySummary,
   toHabitGoals,
 } from './firestore-converters';
-import type { Activity, AiComment, Category, DayRating, HabitGoals, IsoDate } from './types';
+import type {
+  Activity,
+  AiComment,
+  Category,
+  DayRating,
+  DaySummary,
+  HabitGoals,
+  IsoDate,
+} from './types';
 
 /**
  * Where a signed-in user's data lives (plan §2.4):
@@ -25,6 +34,7 @@ import type { Activity, AiComment, Category, DayRating, HabitGoals, IsoDate } fr
  *   users/{uid}/goals/habits       HabitGoals (ADR-008 §2.3), one fixed doc id
  *   users/{uid}/dayRatings/{date}  DayRating (ADR-009 §2.3), doc id = IsoDate
  *   users/{uid}/aiComments/{date}  AiComment (ADR-009 §2.3 F3), doc id = IsoDate
+ *   users/{uid}/summaries/{date}   DaySummary (ADR-009 §2.3, slice 8a), doc id = IsoDate
  *
  * Every write helper takes a `UserScope`, so nothing can touch another user's
  * path by accident (and firestore.rules would reject it anyway).
@@ -57,6 +67,11 @@ const dayRatingConverter: FirestoreDataConverter<DayRating> = {
 const aiCommentConverter: FirestoreDataConverter<AiComment> = {
   toFirestore: (comment) => toAiComment(comment as Record<string, unknown>) as DocumentData,
   fromFirestore: (snapshot) => toAiComment(snapshot.data()),
+};
+
+const daySummaryConverter: FirestoreDataConverter<DaySummary> = {
+  toFirestore: (summary) => toDaySummary(summary as Record<string, unknown>) as DocumentData,
+  fromFirestore: (snapshot) => toDaySummary(snapshot.data()),
 };
 
 export function userDoc({ db, uid }: UserScope): DocumentReference {
@@ -100,4 +115,14 @@ export function aiCommentsCol({ db, uid }: UserScope): CollectionReference<AiCom
 /** `users/{uid}/aiComments/{date}` (ADR-009 §2.3 F3) — doc id is the IsoDate. */
 export function aiCommentDoc(scope: UserScope, date: IsoDate): DocumentReference<AiComment> {
   return doc(aiCommentsCol(scope), date);
+}
+
+export function summariesCol({ db, uid }: UserScope): CollectionReference<DaySummary> {
+  return collection(db, 'users', uid, 'summaries').withConverter(daySummaryConverter);
+}
+
+/** `users/{uid}/summaries/{date}` (ADR-009 §2.3, slice 8a) — doc id is the IsoDate; the
+ * only document a linked parent will be allowed to read (parent read access is 8b). */
+export function summaryDoc(scope: UserScope, date: IsoDate): DocumentReference<DaySummary> {
+  return doc(summariesCol(scope), date);
 }

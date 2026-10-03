@@ -1,4 +1,12 @@
-import type { Activity, AiComment, Category, DayRating, HabitGoals, UserProfile } from './types';
+import type {
+  Activity,
+  AiComment,
+  Category,
+  DayRating,
+  DaySummary,
+  HabitGoals,
+  UserProfile,
+} from './types';
 
 /**
  * Shape guards between Firestore documents (or legacy Dexie rows) and the app
@@ -86,5 +94,16 @@ export function toAiComment(data: Record<string, unknown>): AiComment {
     model: data.model as string,
     inputHash: data.inputHash as string,
     createdAt: data.createdAt as number,
+  };
+}
+
+/** `users/{uid}/summaries/{date}` (ADR-009 §2.3, slice 8a) — built by `build-day-summary.ts`. */
+export function toDaySummary(data: Record<string, unknown>): DaySummary {
+  return {
+    efficiency: data.efficiency as number | null,
+    goals: data.goals as DaySummary['goals'],
+    warnings: data.warnings as DaySummary['warnings'],
+    ratingScore: data.ratingScore as number | null,
+    updatedAt: data.updatedAt as number,
   };
 }

@@ -4,6 +4,7 @@ import {
   toAiComment,
   toCategory,
   toDayRating,
+  toDaySummary,
   toHabitGoals,
   toUserProfile,
 } from './firestore-converters';
@@ -113,5 +114,32 @@ describe('toAiComment', () => {
       createdAt: 1,
     };
     expect(toAiComment({ ...stored, extra: true })).toEqual(stored);
+  });
+});
+
+describe('toDaySummary', () => {
+  const untrackedGoal = { actual: 0, target: null, score: null };
+  const stored = {
+    efficiency: 82,
+    goals: {
+      sleep: { actual: 370, target: 450, score: 0.82 },
+      school: untrackedGoal,
+      extraClass: untrackedGoal,
+      selfStudy: untrackedGoal,
+      meals: untrackedGoal,
+      entertainment: untrackedGoal,
+    },
+    warnings: ['sleep-short'] as const,
+    ratingScore: 4,
+    updatedAt: 1_700_000_000_000,
+  };
+
+  it('keeps exactly the DaySummary fields and drops unknown top-level keys', () => {
+    expect(toDaySummary({ ...stored, date: '2026-10-03', extra: true })).toEqual(stored);
+  });
+
+  it('round-trips a fully untracked day (efficiency and ratingScore null)', () => {
+    const untracked = { ...stored, efficiency: null, ratingScore: null, warnings: [] };
+    expect(toDaySummary(untracked)).toEqual(untracked);
   });
 });
