@@ -78,6 +78,28 @@ export async function openSignedIn(page: Page, path = '/', name?: string): Promi
   return user;
 }
 
+/**
+ * Like `openSignedIn`, but for tests that need a *completed* `goals/habits`
+ * doc (ADR-009 slice 4 reads it): seeds it right after sign-in and reloads,
+ * instead of clicking through the onboarding wizard's "Skip for now". That
+ * matters because Skip fires its own fire-and-forget `saveHabitGoals` write
+ * (status: 'skipped') — racing a REST seed issued afterwards would let
+ * whichever write reaches the emulator last silently win.
+ */
+export async function openSignedInWithGoals(
+  page: Page,
+  goals: HabitGoals,
+  path = '/'
+): Promise<TestUser> {
+  await page.addInitScript(() => localStorage.setItem('sdt-install-dismissed', '1'));
+  await page.goto('/');
+  const user = await signInAs(page, { waitForHome: false });
+  await seedHabitGoals(user.uid, goals);
+  await page.goto(path);
+  await expect(page.getByRole('navigation', { name: 'Primary' }).first()).toBeVisible();
+  return user;
+}
+
 type FirestoreValue =
   | { stringValue: string }
   | { integerValue: string }

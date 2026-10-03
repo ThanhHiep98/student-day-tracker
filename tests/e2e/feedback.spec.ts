@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { openSignedIn, seedActivities, seedDayRatings, seedHabitGoals } from './support/emulator';
+import {
+  openSignedIn,
+  openSignedInWithGoals,
+  seedActivities,
+  seedDayRatings,
+} from './support/emulator';
 import { sampleHabitGoals } from './support/sample-goals';
 
 /**
@@ -72,9 +77,8 @@ test.describe('History', () => {
 
 test.describe('Home — "Today vs your plan" (slice 4)', () => {
   test("shows each goal's status and the bedtime nudge, matching ADR-009 ①", async ({ page }) => {
-    const user = await openSignedIn(page);
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
     const today = await browserToday(page);
-    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
     await seedActivities(user.uid, [
       {
         id: 'sleep-1',
@@ -134,7 +138,7 @@ test.describe('Home — "Today vs your plan" (slice 4)', () => {
     await expect(card.getByText('1h 30m to go')).toBeVisible();
     await expect(card.getByText('Extra class 2h')).toBeVisible();
     await expect(card.getByText('Meals 45m')).toBeVisible();
-    await expect(card.getByText('so far')).toBeVisible();
+    await expect(card.getByText('so far', { exact: true })).toBeVisible();
     await expect(
       card.getByText(
         'You went to bed at 00:40 — 1h 40m later than your 23:00 plan. An earlier night today would get you back on track.'
@@ -143,9 +147,8 @@ test.describe('Home — "Today vs your plan" (slice 4)', () => {
   });
 
   test('warns live once entertainment goes over its cap', async ({ page }) => {
-    const user = await openSignedIn(page);
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
     const today = await browserToday(page);
-    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
     await seedActivities(user.uid, [
       {
         id: 'entertainment-over',
@@ -172,9 +175,8 @@ test.describe('Home — "Today vs your plan" (slice 4)', () => {
 
 test.describe('Insights — "Comments on your week" (slice 4)', () => {
   test('shows the rule-based label and template sentences', async ({ page }) => {
-    const user = await openSignedIn(page);
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
     const today = await browserToday(page);
-    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
     // One tracked, ended day with a short sleep and an entertainment overrun.
     const yesterday = new Date(`${today}T00:00:00`);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -210,9 +212,7 @@ test.describe('Insights — "Comments on your week" (slice 4)', () => {
   });
 
   test('shows a neutral message with no tracked days this week', async ({ page }) => {
-    const user = await openSignedIn(page, '/insights/');
-    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
-    await page.reload();
+    await openSignedInWithGoals(page, sampleHabitGoals(Date.now()), '/insights/');
     const card = page.getByRole('region', { name: 'Comments on your week' });
     await expect(card.getByText('Track a few days this week to see comments here.')).toBeVisible();
   });

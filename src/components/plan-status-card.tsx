@@ -26,9 +26,11 @@ interface PlanStatusCardProps {
   evaluation: DayEvaluation;
 }
 
-function Row({ finding }: { finding: GoalFinding }) {
+function Row({ finding, hiddenOnMobile }: { finding: GoalFinding; hiddenOnMobile: boolean }) {
   return (
-    <li className="flex items-center justify-between gap-3 border-b border-border/70 py-2.5 last:border-b-0">
+    <li
+      className={`flex items-center justify-between gap-3 border-b border-border/70 py-2.5 last:border-b-0 ${hiddenOnMobile ? 'max-sm:hidden' : ''}`}
+    >
       <div className="flex min-w-0 items-center gap-2.5">
         <span
           aria-hidden
@@ -53,17 +55,16 @@ function Row({ finding }: { finding: GoalFinding }) {
  * applies today, a status icon *and* text for each (never colour alone), and
  * at most one amber nudge line (the bedtime warning, D4) — no other row ever
  * carries a suggestion. Desktop shows every row; mobile shows the three most
- * relevant (any warning first) with a "Show all" toggle for the rest.
+ * relevant (any warning first) with a "Show all" toggle for the rest. One
+ * list, ordered by relevance and CSS-truncated on mobile — never two copies
+ * of the same rows, which would both answer the same `getByText` query.
  */
 export function PlanStatusCard({ evaluation }: PlanStatusCardProps) {
   const [expanded, setExpanded] = useState(false);
   const { findings, bedtime } = evaluation;
 
-  const relevant = [...findings].sort(
-    (a, b) => RELEVANCE_RANK[a.status] - RELEVANCE_RANK[b.status]
-  );
-  const mobileRows = expanded ? findings : relevant.slice(0, MOBILE_ROW_LIMIT);
-  const hasMore = findings.length > MOBILE_ROW_LIMIT;
+  const rows = [...findings].sort((a, b) => RELEVANCE_RANK[a.status] - RELEVANCE_RANK[b.status]);
+  const hasMore = rows.length > MOBILE_ROW_LIMIT;
 
   return (
     <section
@@ -86,14 +87,13 @@ export function PlanStatusCard({ evaluation }: PlanStatusCardProps) {
         </p>
       ) : (
         <>
-          <ul className="mt-3 hidden sm:block">
-            {findings.map((finding) => (
-              <Row key={finding.key} finding={finding} />
-            ))}
-          </ul>
-          <ul className="mt-3 sm:hidden">
-            {mobileRows.map((finding) => (
-              <Row key={finding.key} finding={finding} />
+          <ul className="mt-3">
+            {rows.map((finding, i) => (
+              <Row
+                key={finding.key}
+                finding={finding}
+                hiddenOnMobile={!expanded && i >= MOBILE_ROW_LIMIT}
+              />
             ))}
           </ul>
           {hasMore && (

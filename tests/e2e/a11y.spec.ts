@@ -3,10 +3,10 @@ import { type Page, type Route, expect, test } from '@playwright/test';
 import type { Activity } from '../../src/lib/types';
 import {
   openSignedIn,
+  openSignedInWithGoals,
   seedActivities,
   seedDayRatings,
   seedDexie,
-  seedHabitGoals,
   signInAs,
 } from './support/emulator';
 import { sampleHabitGoals } from './support/sample-goals';
@@ -180,12 +180,11 @@ test.describe('signed in', () => {
   test('Home has no accessibility violations with "Today vs your plan" warnings showing (ADR-009 ①)', async ({
     page,
   }) => {
-    const user = await openSignedIn(page);
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
     const today = await page.evaluate(() => {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     });
-    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
     await seedActivities(user.uid, [
       {
         id: 'sleep-1',
@@ -215,12 +214,11 @@ test.describe('signed in', () => {
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    const user = await openSignedIn(page);
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
     const today = await page.evaluate(() => {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     });
-    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
     await seedActivities(user.uid, [
       {
         id: 'sleep-1',
@@ -243,8 +241,7 @@ test.describe('signed in', () => {
   test('/insights/ has no accessibility violations with weekly comments showing (ADR-009 ⑥)', async ({
     page,
   }) => {
-    const user = await openSignedIn(page);
-    await seedHabitGoals(user.uid, sampleHabitGoals(Date.now()));
+    const user = await openSignedInWithGoals(page, sampleHabitGoals(Date.now()));
     const today = await page.evaluate(() => {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
